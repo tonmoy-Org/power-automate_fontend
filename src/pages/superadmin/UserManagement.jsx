@@ -29,6 +29,7 @@ import {
     Tooltip,
     DialogContentText,
     alpha,
+    TablePagination,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -75,6 +76,10 @@ export const UserManagement = () => {
         role: 'manager',
         isActive: true,
     });
+    
+    // Pagination state
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     const { data: users = [], isLoading } = useQuery({
         queryKey: ['users'],
@@ -96,6 +101,23 @@ export const UserManagement = () => {
         );
     }, [users, searchQuery]);
 
+    // Pagination logic
+    const paginatedUsers = useMemo(() => {
+        return filteredUsers.slice(
+            page * rowsPerPage,
+            page * rowsPerPage + rowsPerPage
+        );
+    }, [filteredUsers, page, rowsPerPage]);
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     const createUserMutation = useMutation({
         mutationFn: async (userData) => {
             const response = await axiosInstance.post('/users', userData);
@@ -107,6 +129,7 @@ export const UserManagement = () => {
             setOpenDialog(false);
             resetForm();
             setTimeout(() => setSuccess(''), 3000);
+            setPage(0); // Reset to first page after adding new user
         },
         onError: (err) => {
             setError(err.response?.data?.message || 'Failed to create user');
@@ -125,6 +148,10 @@ export const UserManagement = () => {
             setOpenDeleteDialog(false);
             setUserToDelete(null);
             setTimeout(() => setSuccess(''), 3000);
+            // Adjust page if we're on the last page and it becomes empty
+            if (paginatedUsers.length === 1 && page > 0) {
+                setPage(page - 1);
+            }
         },
         onError: (err) => {
             setError(err.response?.data?.message || 'Failed to delete user');
@@ -431,7 +458,7 @@ export const UserManagement = () => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {filteredUsers.length === 0 ? (
+                        {paginatedUsers.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={5} align="center">
                                     <Box py={4}>
@@ -443,7 +470,7 @@ export const UserManagement = () => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredUsers.map((user) => (
+                            paginatedUsers.map((user) => (
                                 <TableRow
                                     key={user._id}
                                     hover
@@ -575,6 +602,34 @@ export const UserManagement = () => {
                         )}
                     </TableBody>
                 </Table>
+                
+                {/* Pagination */}
+                <TablePagination
+                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    component="div"
+                    count={filteredUsers.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    sx={{
+                        borderTop: `1px solid ${alpha('#000', 0.1)}`,
+                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                            fontSize: '0.875rem',
+                            color: 'text.secondary',
+                        },
+                        '& .MuiTablePagination-actions': {
+                            '& .MuiIconButton-root': {
+                                '&:hover': {
+                                    backgroundColor: alpha(BLUE_COLOR, 0.1),
+                                },
+                            },
+                        },
+                        '& .MuiSelect-select': {
+                            padding: '6px 32px 6px 12px',
+                        },
+                    }}
+                />
             </TableContainer>
 
             {/* Add/Edit User Dialog */}
