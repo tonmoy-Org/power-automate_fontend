@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Dashboard as DashboardIcon,
     People as PeopleIcon,
@@ -6,35 +6,46 @@ import {
     AccountCircle as AccountIcon,
     Notifications as NotificationsIcon,
     HealthAndSafety as HealthIcon,
-    Security as SecurityIcon,
     Schedule as ScheduleIcon,
     TrendingUp as PerformanceIcon,
     History as HistoryIcon,
     Description as FormIcon,
-    MenuBook as CourseIcon,
-    Task as TaskIcon,
     Visibility as ReviewIcon,
     CheckCircle as ApprovalIcon,
     Assessment as AssessmentIcon,
-    PersonAdd as AssignIcon,
     DirectionsCar as VehicleIcon,
-    Build as ToolsIcon,
+    Inventory as InventoryIcon,
     Map as LogisticsIcon,
     LocalShipping as DispatchIcon,
     RequestQuote as QuoteIcon,
-    Inventory as InventoryIcon,
+    Contacts as LeadsIcon,
+    LocationOn as LocateIcon,
     Search as LookupIcon,
     ListAlt as ChecklistIcon,
     Engineering as RepairIcon,
     Star as ScorecardIcon,
     Book as LibraryIcon,
-    Contacts as LeadsIcon,
-    LocationOn as LocateIcon
+    ExpandMore as ExpandMoreIcon,
+    ExpandLess as ExpandLessIcon,
+    // Sub-item icons
+    Description as ReportIcon,
+    Assessment as AssessmentReportIcon,
+    Timeline as TimelineIcon,
 } from '@mui/icons-material';
 
 export const ManagerMenuComponent = ({ onMenuItemClick }) => {
-    const menuItems = [
+    const [expandedSections, setExpandedSections] = useState({
+        'health-reports': false
+    });
 
+    const toggleSection = (sectionId) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [sectionId]: !prev[sectionId]
+        }));
+    };
+
+    const menuItems = [
         // Dashboard & Overview
         {
             sectionName: 'Dashboard & Overview',
@@ -52,6 +63,39 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                 { text: 'Dispatch', icon: <DispatchIcon />, path: '/manager-dashboard/dispatch' },
                 { text: 'Logistics Map', icon: <LogisticsIcon />, path: '/manager-dashboard/logistics' },
                 { text: 'Locates', icon: <LocateIcon />, path: '/manager-dashboard/locates' },
+            ]
+        },
+
+        // Reports & Compliance - Updated with collapsible health reports
+        {
+            sectionName: 'Reports & Compliance',
+            items: [
+                {
+                    text: 'Health Department Reports',
+                    icon: <HealthIcon />,
+                    path: '#',
+                    isExpandable: true,
+                    sectionId: 'health-reports',
+                    expandIcon: <ExpandMoreIcon />,
+                    subItems: [
+                        {
+                            text: 'RME Reports',
+                            icon: <ReportIcon />,
+                            path: '/manager-dashboard/health-department-reports/rme'
+                        },
+                        {
+                            text: 'RSS Reports',
+                            icon: <AssessmentReportIcon />,
+                            path: '/manager-dashboard/health-department-reports/rss'
+                        },
+                        {
+                            text: 'TOS Reports',
+                            icon: <TimelineIcon />,
+                            path: '/manager-dashboard/health-department-reports/tos'
+                        }
+                    ]
+                },
+                { text: 'My Scorecard', icon: <ScorecardIcon />, path: '/manager-dashboard/my-scorecard' },
             ]
         },
 
@@ -93,17 +137,6 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
             ]
         },
 
-        // Reports & Compliance
-        {
-            sectionName: 'Reports & Compliance',
-            items: [
-                { text: 'Health Department Reports (RME)', icon: <HealthIcon />, path: '/manager-dashboard/health-department-reports' },
-                { text: 'Risk Management', icon: <SecurityIcon />, path: '/manager-dashboard/risk-management' },
-                { text: 'Team Scorecard', icon: <ScorecardIcon />, path: '/manager-dashboard/team-scorecard' },
-                { text: 'My Scorecard', icon: <ScorecardIcon />, path: '/manager-dashboard/my-scorecard' },
-            ]
-        },
-
         // Forms & Compliance
         {
             sectionName: 'Forms & Compliance',
@@ -111,16 +144,6 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
                 { text: 'Forms', icon: <FormIcon />, path: '/manager-dashboard/forms' },
                 { text: 'Review Forms', icon: <ReviewIcon />, path: '/manager-dashboard/forms/review' },
                 { text: 'Form Approval', icon: <ApprovalIcon />, path: '/manager-dashboard/forms/approval' },
-            ]
-        },
-
-        // Courses & Training
-        {
-            sectionName: 'Courses & Training',
-            items: [
-                { text: 'Courses', icon: <CourseIcon />, path: '/manager-dashboard/courses' },
-                { text: 'Assign Courses', icon: <AssignIcon />, path: '/manager-dashboard/courses/assign' },
-                { text: 'Progress Tracking', icon: <TaskIcon />, path: '/manager-dashboard/courses/progress' },
             ]
         },
 
@@ -143,11 +166,32 @@ export const ManagerMenuComponent = ({ onMenuItemClick }) => {
         },
     ];
 
-    return menuItems.map(section => ({
-        ...section,
-        items: section.items.map(item => ({
-            ...item,
-            onClick: () => onMenuItemClick(item.path)
-        }))
-    }));
+    // Process menu items to add click handlers
+    const processedMenuItems = menuItems.map(section => {
+        const processedItems = section.items.map(item => {
+            if (item.isExpandable) {
+                return {
+                    ...item,
+                    onClick: () => toggleSection(item.sectionId),
+                    expanded: expandedSections[item.sectionId] || false,
+                    expandIcon: expandedSections[item.sectionId] ? <ExpandLessIcon /> : <ExpandMoreIcon />,
+                    subItems: item.subItems.map(subItem => ({
+                        ...subItem,
+                        onClick: () => onMenuItemClick(subItem.path)
+                    }))
+                };
+            }
+            return {
+                ...item,
+                onClick: () => onMenuItemClick(item.path)
+            };
+        });
+
+        return {
+            ...section,
+            items: processedItems
+        };
+    });
+
+    return processedMenuItems;
 };

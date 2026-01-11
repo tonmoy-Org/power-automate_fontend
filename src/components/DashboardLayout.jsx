@@ -23,7 +23,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import logo from '../public/logo.png';
-import { Menu as MenuIcon } from '@mui/icons-material';
+import { ExpandLess, ExpandMore, Menu as MenuIcon } from '@mui/icons-material';
 import DashboardFooter from './DashboardFooter';
 
 const drawerWidth = 250;
@@ -159,7 +159,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
     }
 
     // Special handling for dashboard root
-    if (path === '/superadmin-dashboard' && path !== '/manager-dashboard' && path !== '/tech-dashboard' && currentPath === '/superadmin-dashboard') {
+    if (path === '/manager-dashboard' && currentPath === '/manager-dashboard') {
       return true;
     }
 
@@ -314,9 +314,12 @@ export default function DashboardLayout({ children, title, menuItems }) {
             {/* Section Items */}
             <List sx={{ py: 0.25 }}>
               {section.items.map((item) => {
-                const button = (
+                const isExpandable = item.isExpandable;
+                const isExpanded = item.expanded;
+
+                const mainButton = (
                   <ListItemButton
-                    onClick={() => handleNavigation(item.path)}
+                    onClick={item.onClick}
                     sx={[
                       getActiveStyles(item.path),
                       {
@@ -336,6 +339,9 @@ export default function DashboardLayout({ children, title, menuItems }) {
                           m: 0,
                         },
                       },
+                      isExpandable && {
+                        pr: 1.5,
+                      }
                     ]}
                   >
                     <ListItemIcon>
@@ -377,44 +383,122 @@ export default function DashboardLayout({ children, title, menuItems }) {
                         {item.text.split(' ').map(word => word.charAt(0)).join('')}
                       </Typography>
                     )}
+                    {isExpandable && open && (
+                      <ListItemIcon sx={{
+                        minWidth: 0,
+                        ml: 'auto',
+                        color: 'inherit',
+                        opacity: 0.7
+                      }}>
+                        {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                      </ListItemIcon>
+                    )}
                   </ListItemButton>
                 );
 
-                return (
-                  <ListItem
-                    key={item.text}
-                    disablePadding
-                    sx={{
-                      display: 'block',
+                // Wrap in tooltip for collapsed state
+                const wrappedButton = open || !isMobile ? (
+                  mainButton
+                ) : (
+                  <Tooltip
+                    title={item.text}
+                    placement="right"
+                    arrow
+                    componentsProps={{
+                      tooltip: {
+                        sx: {
+                          backgroundColor: '#2d3748',
+                          fontSize: '0.8rem',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                        }
+                      },
+                      arrow: {
+                        sx: {
+                          color: '#2d3748',
+                        }
+                      }
                     }}
                   >
-                    {open || !isMobile ? (
-                      button
-                    ) : (
-                      <Tooltip
-                        title={item.text}
-                        placement="right"
-                        arrow
-                        componentsProps={{
-                          tooltip: {
-                            sx: {
-                              backgroundColor: '#2d3748',
-                              fontSize: '0.8rem',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                            }
-                          },
-                          arrow: {
-                            sx: {
-                              color: '#2d3748',
-                            }
-                          }
-                        }}
-                      >
-                        {button}
-                      </Tooltip>
+                    {mainButton}
+                  </Tooltip>
+                );
+
+                return (
+                  <React.Fragment key={item.text}>
+                    <ListItem
+                      disablePadding
+                      sx={{
+                        display: 'block',
+                      }}
+                    >
+                      {wrappedButton}
+                    </ListItem>
+
+                    {/* Sub-items */}
+                    {isExpandable && isExpanded && item.subItems && open && (
+                      <List sx={{
+                        py: 0,
+                        pl: 3.5,
+                        backgroundColor: alpha('#000000', 0.1)
+                      }}>
+                        {item.subItems.map((subItem) => (
+                          <ListItem
+                            key={subItem.text}
+                            disablePadding
+                            sx={{
+                              display: 'block',
+                            }}
+                          >
+                            <ListItemButton
+                              onClick={subItem.onClick}
+                              sx={[
+                                getActiveStyles(subItem.path),
+                                {
+                                  minHeight: 40,
+                                  px: 2.5,
+                                  py: 0.5,
+                                  ml: 1,
+                                  '&:hover': {
+                                    backgroundColor: alpha('#ffffff', 0.1),
+                                  },
+                                  '& .MuiTypography-root': {
+                                    fontSize: '0.8rem',
+                                  }
+                                }
+                              ]}
+                            >
+                              {subItem.icon && (
+                                <ListItemIcon sx={{
+                                  minWidth: 30,
+                                  color: 'inherit',
+                                  opacity: 0.8
+                                }}>
+                                  {React.cloneElement(subItem.icon, {
+                                    sx: { fontSize: 18 }
+                                  })}
+                                </ListItemIcon>
+                              )}
+                              <ListItemText
+                                primary={
+                                  <Typography sx={{
+                                    fontSize: '0.8rem',
+                                    fontWeight: 400,
+                                    color: 'inherit',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}>
+                                    {subItem.text}
+                                  </Typography>
+                                }
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        ))}
+                      </List>
                     )}
-                  </ListItem>
+                  </React.Fragment>
                 );
               })}
             </List>
@@ -514,11 +598,10 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 marginRight: 1.5,
                 width: 32,
                 height: 32,
-                backgroundColor: '#3182ce',
+                background: 'linear-gradient(135deg, #1565C0 0%, #1976D2 100%)',
                 color: '#ffffff',
                 '&:hover': {
-                  backgroundColor: '#2c5282',
-                  color: '#ffffff',
+                  background: 'linear-gradient(135deg, #0D47A1 0%, #1565C0 100%)',
                 },
               }}
             >

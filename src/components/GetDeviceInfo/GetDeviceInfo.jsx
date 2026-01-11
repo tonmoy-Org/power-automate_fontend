@@ -1,21 +1,27 @@
 import { UAParser } from 'ua-parser-js';
 
-const GetDeviceInfo = () => {
+const getDeviceInfo = () => {
   const parser = new UAParser();
   const result = parser.getResult();
 
-  const rawId = `${result.browser.name}-${result.os.name}-${result.device.type || 'Desktop'}`;
-  const deviceId = btoa(rawId);
+  // 🔐 Stable device ID per browser
+  let deviceId = localStorage.getItem('deviceId');
+
+  if (!deviceId) {
+    const rawId = `${result.browser.name}-${result.browser.version}-${result.os.name}-${navigator.userAgent}`;
+    deviceId = btoa(rawId);
+    localStorage.setItem('deviceId', deviceId);
+  }
 
   return {
     deviceId,
-    browser: result.browser.name,
-    browserVersion: result.browser.version,
-    os: result.os.name,
-    osVersion: result.os.version,
+    browser: result.browser.name || 'Unknown',
+    browserVersion: result.browser.version || 'Unknown',
+    os: result.os.name || 'Unknown',
+    osVersion: result.os.version || 'Unknown',
     deviceType: result.device.type || 'Desktop',
     date: new Date(),
   };
 };
 
-export default GetDeviceInfo;
+export default getDeviceInfo;

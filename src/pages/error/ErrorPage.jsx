@@ -17,8 +17,9 @@ import {
 import StyledTextField from '../../components/ui/StyledTextField';
 import GradientButton from '../../components/ui/GradientButton';
 
-const BLUE_COLOR = '#76AADA';
-const BLUE_DARK = '#5A8FC8';
+const BLUE_LIGHT = '#A8C9E9';
+const BLUE_COLOR = '#1976d2';
+const BLUE_DARK = '#1565c0';
 
 export const ErrorPage = () => {
     const navigate = useNavigate();

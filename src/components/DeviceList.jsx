@@ -20,9 +20,9 @@ import {
 } from '@mui/icons-material';
 
 // Define color constants
-const BLUE_COLOR = '#76AADA';
 const BLUE_LIGHT = '#A8C9E9';
-const BLUE_DARK = '#5A8FC8';
+const BLUE_COLOR = '#1976d2';
+const BLUE_DARK = '#1565c0';
 const GREEN_COLOR = '#10b981';
 const GREEN_LIGHT = '#a7f3d0';
 const GREEN_DARK = '#059669';

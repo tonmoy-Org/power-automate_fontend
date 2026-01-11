@@ -1,22 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Dashboard as DashboardIcon,
     People as PeopleIcon,
     AccountCircle as AccountIcon,
-    Settings as SettingsIcon,
     LocationOn as LocationIcon,
     HealthAndSafety as HealthIcon,
-    Security as SecurityIcon,
-    MenuBook as CourseIcon,
     Description as FormIcon,
     Notifications as NotificationIcon,
     NotificationsActive as ReminderIcon,
     Assignment as ReportIcon,
     History as HistoryIcon,
-    Storage as SystemIcon
+    Storage as SystemIcon,
+    ExpandMore as ExpandMoreIcon,
+    ExpandLess as ExpandLessIcon,
+    // Sub-item icons for health reports
+    Description as RMEReportIcon,
+    Assessment as RSSReportIcon,
+    Timeline as TOSReportIcon
 } from '@mui/icons-material';
 
 export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
+    const [expandedSections, setExpandedSections] = useState({
+        'health-reports': false
+    });
+
+    const toggleSection = (sectionId) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [sectionId]: !prev[sectionId]
+        }));
+    };
+
     const menuItems = [
         // Main Section
         {
@@ -35,15 +49,10 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
             ]
         },
 
-        // System & Configuration Section
+        // System & Configuration Section - Updated with collapsible health reports
         {
             sectionName: 'System & Configuration',
             items: [
-                {
-                    text: 'Tech Box',
-                    icon: <SettingsIcon />,
-                    path: '/superadmin-dashboard/tech-box'
-                },
                 {
                     text: 'Locations',
                     icon: <LocationIcon />,
@@ -52,17 +61,26 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                 {
                     text: 'Health Department Report Tracking',
                     icon: <HealthIcon />,
-                    path: '/superadmin-dashboard/health-department-report-tracking'
-                },
-                {
-                    text: 'Risk Management',
-                    icon: <SecurityIcon />,
-                    path: '/superadmin-dashboard/risk-management'
-                },
-                {
-                    text: 'Courses',
-                    icon: <CourseIcon />,
-                    path: '/superadmin-dashboard/courses'
+                    path: '#',
+                    isExpandable: true,
+                    sectionId: 'health-reports',
+                    subItems: [
+                        {
+                            text: 'RME Reports',
+                            icon: <RMEReportIcon />,
+                            path: '/superadmin-dashboard/health-department-report-tracking/rme'
+                        },
+                        {
+                            text: 'RSS Reports',
+                            icon: <RSSReportIcon />,
+                            path: '/superadmin-dashboard/health-department-report-tracking/rss'
+                        },
+                        {
+                            text: 'TOS Reports',
+                            icon: <TOSReportIcon />,
+                            path: '/superadmin-dashboard/health-department-report-tracking/tos'
+                        }
+                    ]
                 },
                 {
                     text: 'Forms',
@@ -117,12 +135,32 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
         },
     ];
 
-    // Return structured menu items with section information
-    return menuItems.map(section => ({
-        ...section,
-        items: section.items.map(item => ({
-            ...item,
-            onClick: () => onMenuItemClick(item.path)
-        }))
-    }));
+    // Process menu items to add click handlers
+    const processedMenuItems = menuItems.map(section => {
+        const processedItems = section.items.map(item => {
+            if (item.isExpandable) {
+                return {
+                    ...item,
+                    onClick: () => toggleSection(item.sectionId),
+                    expanded: expandedSections[item.sectionId] || false,
+                    expandIcon: expandedSections[item.sectionId] ? <ExpandLessIcon /> : <ExpandMoreIcon />,
+                    subItems: item.subItems.map(subItem => ({
+                        ...subItem,
+                        onClick: () => onMenuItemClick(subItem.path)
+                    }))
+                };
+            }
+            return {
+                ...item,
+                onClick: () => onMenuItemClick(item.path)
+            };
+        });
+
+        return {
+            ...section,
+            items: processedItems
+        };
+    });
+
+    return processedMenuItems;
 };

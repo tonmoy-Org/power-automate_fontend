@@ -17,13 +17,12 @@ import { ManagerProfile } from '../pages/manager/Profile';
 
 import { TechDashboard } from '../pages/tech/TechDashboard';
 import { TechProfile } from '../pages/tech/Profile';
-import { VehicleTools } from '../pages/manager/vehicle-tools/VehicleTools';
-import VehicleList from '../pages/manager/vehicle-tools/VehicleList';
-import VehicleForm from '../pages/manager/vehicle-tools/VehicleForm';
-import VehicleDetails from '../pages/manager/vehicle-tools/VehicleDetails';
 import { TechUserManagement } from '../pages/manager/TechUserManagement';
 import { ErrorPage } from '../pages/error/ErrorPage';
 import Locates from '../pages/manager/locates/Locates';
+import RMEReports from '../pages/manager/HMIS/RMEReports';
+import RSSReports from '../pages/manager/HMIS/RSSReports';
+import TOSReports from '../pages/manager/HMIS/TOSReports';
 
 
 
@@ -82,13 +81,10 @@ export const AppRoutes = () => {
           <Route path="techs" element={<TechUserManagement />} />
           <Route path="locates" element={<Locates />} />
 
-          {/* 🚛 VEHICLE & TOOLS ROUTES */}
-          <Route path="vehicles" element={<VehicleTools />}>
-            <Route index element={<VehicleList />} />
-            <Route path="new" element={<VehicleForm />} />
-            <Route path=":vehicleId" element={<VehicleDetails />} />
-            <Route path=":vehicleId/edit" element={<VehicleForm />} />
-          </Route>
+          {/* Health Department Reports */}
+          <Route path="health-department-reports/rme" element={<RMEReports />} />
+          <Route path="health-department-reports/rss" element={<RSSReports />} />
+          <Route path="health-department-reports/tos" element={<TOSReports />} />
         </Route>
 
         {/* Tech Routes */}
