@@ -10,6 +10,7 @@ import {
     ListItemText,
     Divider,
     alpha,
+    useTheme,
 } from '@mui/material';
 import {
     Laptop as LaptopIcon,
@@ -19,21 +20,22 @@ import {
     CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 
-// Define color constants
-const BLUE_LIGHT = '#A8C9E9';
-const BLUE_COLOR = '#1976d2';
-const BLUE_DARK = '#0F1115';
-const GREEN_COLOR = '#10b981';
-const GREEN_LIGHT = '#a7f3d0';
-const GREEN_DARK = '#059669';
-
 const DeviceList = ({ devices = [] }) => {
+    const theme = useTheme();
+
+    // Use theme colors
+    const BLUE_COLOR = theme.palette.primary.main;
+    const BLUE_DARK = theme.palette.primary.dark || theme.palette.primary.main;
+    const GREEN_COLOR = theme.palette.success.main;
+    const GREEN_DARK = theme.palette.success.dark || theme.palette.success.main;
+    const TEXT_PRIMARY = theme.palette.text.primary;
+
     const getDeviceIcon = (deviceType) => {
         const type = deviceType?.toLowerCase();
-        if (type === 'mobile') return <PhoneIcon sx={{ color: BLUE_COLOR }} />;
-        if (type === 'tablet') return <TabletIcon sx={{ color: BLUE_COLOR }} />;
-        if (type === 'laptop') return <LaptopIcon sx={{ color: BLUE_COLOR }} />;
-        return <ComputerIcon sx={{ color: BLUE_COLOR }} />;
+        if (type === 'mobile') return <PhoneIcon sx={{ color: BLUE_COLOR, fontSize: '0.9rem' }} />;
+        if (type === 'tablet') return <TabletIcon sx={{ color: BLUE_COLOR, fontSize: '0.9rem' }} />;
+        if (type === 'laptop') return <LaptopIcon sx={{ color: BLUE_COLOR, fontSize: '0.9rem' }} />;
+        return <ComputerIcon sx={{ color: BLUE_COLOR, fontSize: '0.9rem' }} />;
     };
 
     const formatDate = (date) => {
@@ -50,16 +52,18 @@ const DeviceList = ({ devices = [] }) => {
     if (!devices || devices.length === 0) {
         return (
             <Paper
-                elevation={1}
+                elevation={0}
                 sx={{
-                    p: 3,
-                    borderRadius: 2,
+                    p: 2,
+                    borderRadius: 1.5,
                     textAlign: 'center',
-                    border: `1px solid ${alpha('#000', 0.08)}`,
-                    backgroundColor: alpha(BLUE_COLOR, 0.02),
+                    border: `1px solid ${theme.palette.divider}`,
+                    backgroundColor: theme.palette.mode === 'dark'
+                        ? alpha(BLUE_COLOR, 0.05)
+                        : alpha(BLUE_COLOR, 0.02),
                 }}
             >
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="caption" color={TEXT_PRIMARY} sx={{ fontSize: '0.75rem' }}>
                     No active devices found
                 </Typography>
             </Paper>
@@ -68,18 +72,20 @@ const DeviceList = ({ devices = [] }) => {
 
     return (
         <Paper
-            elevation={1}
+            elevation={0}
             sx={{
-                p: 2,
-                borderRadius: 2,
-                border: `1px solid ${alpha('#000', 0.08)}`,
+                p: 1.5,
+                borderRadius: 1.5,
+                border: `1px solid ${theme.palette.divider}`,
+                backgroundColor: theme.palette.background.paper,
             }}
         >
-            <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-                <Typography 
-                    variant="h6" 
-                    fontWeight="bold"
-                    color={BLUE_DARK}
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+                <Typography
+                    variant="subtitle2"
+                    fontWeight={600}
+                    color={TEXT_PRIMARY}
+                    sx={{ fontSize: '0.85rem' }}
                 >
                     Active Devices
                 </Typography>
@@ -87,10 +93,18 @@ const DeviceList = ({ devices = [] }) => {
                     label={`${devices.length} ${devices.length === 1 ? 'Device' : 'Devices'}`}
                     size="small"
                     sx={{
-                        backgroundColor: alpha(BLUE_COLOR, 0.1),
-                        color: BLUE_DARK,
+                        backgroundColor: theme.palette.mode === 'dark'
+                            ? alpha(BLUE_COLOR, 0.2)
+                            : alpha(BLUE_COLOR, 0.1),
+                        color: BLUE_COLOR,
                         borderColor: BLUE_COLOR,
                         fontWeight: 500,
+                        fontSize: '0.7rem',
+                        height: 22,
+                        '& .MuiChip-label': {
+                            px: 1,
+                            py: 0.25,
+                        },
                     }}
                     variant="outlined"
                 />
@@ -101,36 +115,47 @@ const DeviceList = ({ devices = [] }) => {
                     <React.Fragment key={device.deviceId || index}>
                         <ListItem
                             sx={{
-                                px: 2,
-                                py: 1.5,
+                                px: 1.5,
+                                py: 1,
                                 borderRadius: 1,
                                 '&:hover': {
-                                    backgroundColor: alpha(BLUE_COLOR, 0.03),
+                                    backgroundColor: theme.palette.mode === 'dark'
+                                        ? alpha(BLUE_COLOR, 0.08)
+                                        : alpha(BLUE_COLOR, 0.03),
                                 },
                             }}
                         >
-                            <ListItemIcon sx={{ minWidth: 40 }}>
+                            <ListItemIcon sx={{ minWidth: 32 }}>
                                 {getDeviceIcon(device.deviceType)}
                             </ListItemIcon>
                             <ListItemText
                                 primary={
-                                    <Box display="flex" alignItems="center" gap={1}>
-                                        <Typography variant="body2" fontWeight="medium">
+                                    <Box display="flex" alignItems="center" gap={0.75}>
+                                        <Typography variant="caption" fontWeight={600} color={TEXT_PRIMARY} sx={{ fontSize: '0.8rem' }}>
                                             {device.deviceType || 'Desktop'}
                                         </Typography>
                                         {index === 0 && (
                                             <Chip
-                                                icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
+                                                icon={<CheckCircleIcon sx={{ fontSize: '0.7rem' }} />}
                                                 label="Current"
                                                 size="small"
                                                 sx={{
-                                                    height: 20,
-                                                    backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                                    color: GREEN_DARK,
+                                                    height: 18,
+                                                    backgroundColor: theme.palette.mode === 'dark'
+                                                        ? alpha(GREEN_COLOR, 0.2)
+                                                        : alpha(GREEN_COLOR, 0.1),
+                                                    color: GREEN_COLOR,
                                                     borderColor: GREEN_COLOR,
                                                     fontWeight: 500,
+                                                    fontSize: '0.65rem',
                                                     '& .MuiChip-icon': {
                                                         color: GREEN_COLOR,
+                                                        fontSize: '0.65rem',
+                                                        ml: 0.5,
+                                                    },
+                                                    '& .MuiChip-label': {
+                                                        px: 0.75,
+                                                        py: 0,
                                                     },
                                                 }}
                                                 variant="outlined"
@@ -139,11 +164,11 @@ const DeviceList = ({ devices = [] }) => {
                                     </Box>
                                 }
                                 secondary={
-                                    <Box sx={{ mt: 0.5 }}>
-                                        <Typography variant="caption" display="block" color="text.secondary">
+                                    <Box sx={{ mt: 0.25 }}>
+                                        <Typography display="block" color={TEXT_PRIMARY} sx={{ fontSize: '0.75rem' }}>
                                             {device.browser} {device.browserVersion && `v${device.browserVersion}`} • {device.os} {device.osVersion}
                                         </Typography>
-                                        <Typography variant="caption" display="block" color="text.secondary">
+                                        <Typography display="block" color={TEXT_PRIMARY} sx={{ fontSize: '0.75rem', opacity: 0.8 }}>
                                             Last active: {formatDate(device.lastActive || device.date)}
                                         </Typography>
                                     </Box>
@@ -151,12 +176,12 @@ const DeviceList = ({ devices = [] }) => {
                             />
                         </ListItem>
                         {index < devices.length - 1 && (
-                            <Divider 
-                                component="li" 
-                                sx={{ 
-                                    backgroundColor: alpha(BLUE_COLOR, 0.1),
-                                    margin: '4px 0',
-                                }} 
+                            <Divider
+                                component="li"
+                                sx={{
+                                    backgroundColor: theme.palette.divider,
+                                    margin: '2px 0',
+                                }}
                             />
                         )}
                     </React.Fragment>

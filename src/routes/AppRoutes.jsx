@@ -23,6 +23,8 @@ import TOSReports from '../pages/member/HMIS/TOSReports';
 
 import { ClientDashboard } from '../pages/client/ClientDashboard';
 import { ClientProfile } from '../pages/client/Profile';
+import ForgotPassword from '../pages/forgot-password/ForgotPassword';
+import ResetPassword from '../pages/reset-password/ResetPassword';
 
 
 
@@ -36,6 +38,8 @@ export const AppRoutes = () => {
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Error Routes */}
         <Route path="/error" element={<ErrorPage />} />

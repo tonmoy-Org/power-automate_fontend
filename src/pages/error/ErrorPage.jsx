@@ -7,6 +7,7 @@ import {
     TextField,
     InputAdornment,
     alpha,
+    useTheme,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -17,12 +18,15 @@ import {
 import StyledTextField from '../../components/ui/StyledTextField';
 import GradientButton from '../../components/ui/GradientButton';
 
-const BLUE_LIGHT = '#A8C9E9';
-const BLUE_COLOR = '#1976d2';
-const BLUE_DARK = '#1565c0';
-
 export const ErrorPage = () => {
+    const theme = useTheme();
     const navigate = useNavigate();
+
+    // Use theme colors
+    const BLUE_COLOR = theme.palette.primary.main;
+    const BLUE_DARK = theme.palette.primary.dark || theme.palette.primary.main;
+    const TEXT_PRIMARY = theme.palette.text.primary;
+
     const [searchQuery, setSearchQuery] = useState('');
 
     const handleGoHome = () => navigate('/dashboard');
@@ -42,7 +46,7 @@ export const ErrorPage = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                bgcolor: 'background.default',
+                bgcolor: theme.palette.background.default,
                 py: 4,
             }}
         >
@@ -80,7 +84,7 @@ export const ErrorPage = () => {
                             sx={{
                                 fontWeight: 600,
                                 mb: 1,
-                                color: 'text.primary',
+                                color: TEXT_PRIMARY,
                                 fontSize: '1.5rem',
                             }}
                         >
@@ -90,9 +94,10 @@ export const ErrorPage = () => {
                         <Typography
                             sx={{
                                 mb: 0,
-                                color: 'text.secondary',
+                                color: TEXT_PRIMARY,
                                 fontSize: '0.9rem',
                                 maxWidth: '400px',
+                                opacity: 0.8,
                             }}
                         >
                             The page you are looking for was not found.
@@ -159,6 +164,10 @@ export const ErrorPage = () => {
                             borderColor: BLUE_COLOR,
                             color: BLUE_COLOR,
                             px: 2.5,
+                            '&:hover': {
+                                borderColor: BLUE_DARK,
+                                backgroundColor: alpha(BLUE_COLOR, 0.04),
+                            },
                         }}
                     >
                         Go Back
@@ -172,6 +181,9 @@ export const ErrorPage = () => {
                             textTransform: 'none',
                             background: `linear-gradient(135deg, ${BLUE_COLOR} 0%, ${BLUE_DARK} 100%)`,
                             px: 2.5,
+                            '&:hover': {
+                                background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${theme.palette.primary.dark || BLUE_DARK} 100%)`,
+                            },
                         }}
                     >
                         Go to Dashboard

@@ -17,7 +17,6 @@ import {
     LinearProgress,
     useTheme,
     useMediaQuery,
-    styled,
     alpha,
 } from '@mui/material';
 import {
@@ -36,22 +35,20 @@ import GradientButton from './ui/GradientButton';
 import OutlineButton from './ui/OutlineButton';
 import DeviceList from './DeviceList';
 
-// Define color constants
-const BLUE_LIGHT = '#A8C9E9';
-const BLUE_COLOR = '#0F1115';
-const BLUE_DARK = '#0F1115';
-const RED_COLOR = '#ef4444';
-const RED_LIGHT = '#fca5a5';
-const RED_DARK = '#dc2626';
-const GREEN_COLOR = '#10b981';
-const GREEN_LIGHT = '#a7f3d0';
-const GREEN_DARK = '#059669';
-
 export const ProfilePage = ({ roleLabel }) => {
     const { user, updateUser } = useAuth();
     const queryClient = useQueryClient();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Use theme colors
+    const BLUE_COLOR = theme.palette.primary.main;
+    const BLUE_DARK = theme.palette.primary.dark || theme.palette.primary.main;
+    const RED_COLOR = theme.palette.error.main;
+    const RED_DARK = theme.palette.error.dark || theme.palette.error.main;
+    const GREEN_COLOR = theme.palette.success.main;
+    const TEXT_PRIMARY = theme.palette.text.primary;
+
     const [isEditing, setIsEditing] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -264,7 +261,7 @@ export const ProfilePage = ({ roleLabel }) => {
     if (isLoading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress sx={{ color: BLUE_COLOR }} />
+                <CircularProgress sx={{ color: BLUE_COLOR, size: 'small' }} />
             </Box>
         );
     }
@@ -275,14 +272,19 @@ export const ProfilePage = ({ roleLabel }) => {
                 <Alert severity="error" sx={{
                     width: '100%',
                     maxWidth: 500,
-                    borderRadius: 2,
-                    backgroundColor: alpha(RED_COLOR, 0.05),
-                    borderLeft: `4px solid ${RED_COLOR}`,
+                    borderRadius: 1.5,
+                    backgroundColor: theme.palette.mode === 'dark'
+                        ? alpha(RED_COLOR, 0.1)
+                        : alpha(RED_COLOR, 0.05),
+                    borderLeft: `3px solid ${RED_COLOR}`,
+                    color: TEXT_PRIMARY,
+                    py: 1,
+                    px: 2,
                 }}>
-                    <Typography variant="h6" color={RED_DARK} gutterBottom>
+                    <Typography variant="subtitle2" color={RED_DARK} gutterBottom sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
                         Failed to load profile
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="caption" color={TEXT_PRIMARY} sx={{ fontSize: '0.75rem' }}>
                         {fetchError?.message || 'Please try again later.'}
                     </Typography>
                 </Alert>
@@ -296,14 +298,19 @@ export const ProfilePage = ({ roleLabel }) => {
                 <Alert severity="warning" sx={{
                     width: '100%',
                     maxWidth: 500,
-                    borderRadius: 2,
-                    backgroundColor: alpha('#f59e0b', 0.05),
-                    borderLeft: `4px solid #f59e0b`,
+                    borderRadius: 1.5,
+                    backgroundColor: theme.palette.mode === 'dark'
+                        ? alpha('#f59e0b', 0.1)
+                        : alpha('#f59e0b', 0.05),
+                    borderLeft: `3px solid #f59e0b`,
+                    color: TEXT_PRIMARY,
+                    py: 1,
+                    px: 2,
                 }}>
-                    <Typography variant="h6" color="#d97706" gutterBottom>
+                    <Typography variant="subtitle2" color="#d97706" gutterBottom sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
                         Profile not found
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="caption" color={TEXT_PRIMARY} sx={{ fontSize: '0.75rem' }}>
                         Unable to load profile data. Please refresh the page.
                     </Typography>
                 </Alert>
@@ -323,8 +330,10 @@ export const ProfilePage = ({ roleLabel }) => {
                         left: 0,
                         right: 0,
                         zIndex: 9999,
-                        height: 3,
-                        backgroundColor: alpha(BLUE_COLOR, 0.1),
+                        height: 2,
+                        backgroundColor: theme.palette.mode === 'dark'
+                            ? alpha(BLUE_COLOR, 0.2)
+                            : alpha(BLUE_COLOR, 0.1),
                         '& .MuiLinearProgress-bar': {
                             backgroundColor: BLUE_COLOR,
                         },
@@ -332,12 +341,12 @@ export const ProfilePage = ({ roleLabel }) => {
                 />
             )}
 
-            <Box sx={{ display: { xs: '', lg: 'flex' } }} justifyContent="space-between" alignItems="center" mb={1}>
+            <Box sx={{ display: { xs: '', lg: 'flex' } }} justifyContent="space-between" alignItems="center" mb={2}>
                 <Box mb={isMobile ? 2 : 0}>
                     <Typography sx={{
-                        fontWeight: 'bold',
+                        fontWeight: 600,
                         mb: 0.5,
-                        fontSize: 20,
+                        fontSize: '1.1rem',
                         background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
@@ -345,35 +354,39 @@ export const ProfilePage = ({ roleLabel }) => {
                     }}>
                         My Profile
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="caption" color={TEXT_PRIMARY} sx={{ fontSize: '0.75rem' }}>
                         Manage your account settings and preferences
                     </Typography>
                 </Box>
                 {!isEditing ? (
                     <GradientButton
                         variant="contained"
-                        startIcon={<EditIcon />}
+                        startIcon={<EditIcon sx={{ fontSize: '0.9rem' }} />}
                         onClick={() => setIsEditing(true)}
                         disabled={updating}
-                        size={isMobile ? "small" : "large"}
+                        size={isMobile ? "small" : "small"}
+                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
                     >
                         Edit Profile
                     </GradientButton>
                 ) : (
-                    <Box display="flex" gap={2}>
+                    <Box display="flex" gap={1.5}>
                         <OutlineButton
-                            startIcon={<CancelIcon />}
+                            startIcon={<CancelIcon sx={{ fontSize: '0.9rem' }} />}
                             onClick={handleCancel}
                             disabled={updating}
                             size='small'
+                            sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
                         >
                             Cancel
                         </OutlineButton>
                         <GradientButton
                             variant="contained"
-                            startIcon={<SaveIcon />}
+                            startIcon={<SaveIcon sx={{ fontSize: '0.9rem' }} />}
                             onClick={handleSave}
                             disabled={updating}
+                            size='small'
+                            sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
                         >
                             {updating ? 'Saving...' : 'Save Changes'}
                         </GradientButton>
@@ -389,37 +402,39 @@ export const ProfilePage = ({ roleLabel }) => {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                        backgroundColor: theme.palette.mode === 'dark'
+                            ? 'rgba(0, 0, 0, 0.7)'
+                            : 'rgba(255, 255, 255, 0.7)',
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
                         zIndex: 1000,
+                        borderRadius: 2,
                     }}
                 >
-                    <CircularProgress sx={{ color: BLUE_COLOR }} />
+                    <CircularProgress sx={{ color: BLUE_COLOR, size: 'small' }} />
                 </Box>
             )}
 
-            <Grid container spacing={3}>
-                {/* KEPT ORIGINAL SYNTAX: size={{ xs: 12, md: 8 }} */}
+            <Grid container spacing={2}>
                 <Grid size={{ xs: 12, md: 8 }}>
                     <Paper
-                        elevation={1}
+                        elevation={0}
                         sx={{
-                            p: 2,
+                            p: 1.5,
                             height: '100%',
-                            borderRadius: 2,
-                            border: `1px solid ${alpha('#000', 0.08)}`,
+                            borderRadius: 1.5,
+                            backgroundColor: theme.palette.background.paper,
+                            border: `1px solid ${theme.palette.divider}`,
                         }}
                     >
-                        <Box display="flex" alignItems="center" mb={3}>
-                            <Typography variant="h6" fontWeight="bold" color={BLUE_DARK}>
+                        <Box display="flex" alignItems="center" mb={2}>
+                            <Typography variant="subtitle1" fontWeight={600} color={TEXT_PRIMARY} sx={{ fontSize: '0.9rem' }}>
                                 Personal Information
                             </Typography>
                         </Box>
 
-                        <Grid container spacing={2}>
-                            {/* KEPT ORIGINAL SYNTAX: size={{ xs: 12, md: 6 }} */}
+                        <Grid container spacing={1.5}>
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <StyledTextField
                                     fullWidth
@@ -431,15 +446,29 @@ export const ProfilePage = ({ roleLabel }) => {
                                     error={!formData.name?.trim() && isEditing}
                                     helperText={!formData.name?.trim() && isEditing ? "Name is required" : ""}
                                     InputProps={{
-                                        startAdornment: <PersonIcon sx={{ mr: 1, color: BLUE_COLOR }} />,
+                                        startAdornment: <PersonIcon sx={{ mr: 1, fontSize: '0.9rem', color: TEXT_PRIMARY }} />,
                                     }}
                                     variant="outlined"
                                     size="small"
-                                    sx={{ mb: 2 }}
+                                    sx={{
+                                        mb: 1.5,
+                                        '& .MuiInputBase-input': {
+                                            fontSize: '0.8rem',
+                                            color: TEXT_PRIMARY,
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: '0.8rem',
+                                            color: TEXT_PRIMARY,
+                                        },
+                                        '& .MuiOutlinedInput-root': {
+                                            '& fieldset': {
+                                                borderColor: alpha(TEXT_PRIMARY, 0.3),
+                                            },
+                                        },
+                                    }}
                                 />
                             </Grid>
 
-                            {/* KEPT ORIGINAL SYNTAX: size={{ xs: 12, md: 6 }} */}
                             <Grid size={{ xs: 12, md: 6 }}>
                                 <StyledTextField
                                     fullWidth
@@ -452,25 +481,40 @@ export const ProfilePage = ({ roleLabel }) => {
                                     error={(!/\S+@\S+\.\S+/.test(formData.email)) && isEditing && formData.email}
                                     helperText={(!/\S+@\S+\.\S+/.test(formData.email)) && isEditing && formData.email ? "Enter valid email" : ""}
                                     InputProps={{
-                                        startAdornment: <EmailIcon sx={{ mr: 1, color: BLUE_COLOR }} />,
+                                        startAdornment: <EmailIcon sx={{ mr: 1, fontSize: '0.9rem', color: TEXT_PRIMARY }} />,
                                     }}
                                     variant="outlined"
                                     size="small"
-                                    sx={{ mb: 2 }}
+                                    sx={{
+                                        mb: 1.5,
+                                        '& .MuiInputBase-input': {
+                                            fontSize: '0.8rem',
+                                            color: TEXT_PRIMARY,
+                                        },
+                                        '& .MuiInputLabel-root': {
+                                            fontSize: '0.8rem',
+                                            color: TEXT_PRIMARY,
+                                        },
+                                        '& .MuiOutlinedInput-root': {
+                                            '& fieldset': {
+                                                borderColor: alpha(TEXT_PRIMARY, 0.3),
+                                            },
+                                        },
+                                    }}
                                 />
                             </Grid>
                         </Grid>
 
                         <Divider sx={{
-                            my: 3,
-                            backgroundColor: alpha(BLUE_COLOR, 0.2),
+                            my: 2,
+                            backgroundColor: theme.palette.divider,
                         }} />
 
                         <DeviceList devices={profile?.devices || []} />
 
                         {profile?.createdAt && (
-                            <Box mt={3}>
-                                <Typography variant="caption" color="text.secondary">
+                            <Box mt={2}>
+                                <Typography variant="caption" color={TEXT_PRIMARY} sx={{ fontSize: '0.7rem' }}>
                                     Account created: {new Date(profile.createdAt).toLocaleDateString()}
                                 </Typography>
                             </Box>
@@ -478,65 +522,72 @@ export const ProfilePage = ({ roleLabel }) => {
                     </Paper>
                 </Grid>
 
-                {/* KEPT ORIGINAL SYNTAX: size={{ xs: 12, md: 4 }} */}
                 <Grid size={{ xs: 12, md: 4 }}>
                     <Paper
-                        elevation={1}
+                        elevation={0}
                         sx={{
-                            p: 2,
+                            p: 1.5,
                             height: '100%',
-                            borderRadius: 2,
-                            border: `1px solid ${alpha('#000', 0.08)}`,
+                            borderRadius: 1.5,
+                            backgroundColor: theme.palette.background.paper,
+                            border: `1px solid ${theme.palette.divider}`,
                         }}
                     >
                         <Box display="flex" flexDirection="column" alignItems="center">
                             <Avatar
                                 sx={{
-                                    width: 120,
-                                    height: 120,
-                                    fontSize: 48,
-                                    fontWeight: 'bold',
-                                    mb: 3,
+                                    width: 80,
+                                    height: 80,
+                                    fontSize: 32,
+                                    fontWeight: 600,
+                                    mb: 2,
+                                    bgcolor: BLUE_COLOR,
+                                    color: theme.palette.getContrastText(BLUE_COLOR),
                                 }}
                             >
                                 {(formData.name?.charAt(0) || profile?.name?.charAt(0) || user?.name?.charAt(0) || 'U')?.toUpperCase()}
                             </Avatar>
 
-                            <Typography variant="h5" fontWeight="bold" align="center" gutterBottom>
+                            <Typography variant="subtitle1" fontWeight={600} align="center" gutterBottom color={TEXT_PRIMARY} sx={{ fontSize: '0.9rem' }}>
                                 {formData.name || profile?.name || user?.name || 'User'}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" align="center" mb={3}>
+                            <Typography variant="caption" color={TEXT_PRIMARY} align="center" mb={2} sx={{ fontSize: '0.75rem' }}>
                                 {formData.email || profile?.email || user?.email || ''}
                             </Typography>
 
                             <Chip
-                                icon={<SecurityIcon />}
+                                icon={<SecurityIcon sx={{ fontSize: '0.8rem', color: BLUE_COLOR }} />}
                                 label={roleLabel || (profile?.role || user?.role || 'USER').replace('_', ' ').toUpperCase()}
                                 size="small"
                                 sx={{
-                                    mb: 4,
-                                    fontWeight: 'bold',
-                                    px: 2,
-                                    py: 1,
-                                    color: '#0F1115',
-                                    '& .MuiChip-icon': {
-                                        color: '#0F1115',
+                                    mb: 3,
+                                    fontWeight: 500,
+                                    px: 1.5,
+                                    py: 0.5,
+                                    fontSize: '0.7rem',
+                                    backgroundColor: theme.palette.mode === 'dark'
+                                        ? alpha(BLUE_COLOR, 0.2)
+                                        : alpha(BLUE_COLOR, 0.1),
+                                    color: BLUE_COLOR,
+                                    '& .MuiChip-label': {
+                                        color: BLUE_COLOR,
                                     },
                                 }}
                             />
                         </Box>
 
                         <Divider sx={{
-                            my: 4,
-                            backgroundColor: alpha(BLUE_COLOR, 0.2),
+                            my: 3,
+                            backgroundColor: theme.palette.divider,
                         }} />
 
-                        <Box display="flex" flexDirection="column" gap={2}>
+                        <Box display="flex" flexDirection="column" gap={1.5}>
                             <OutlineButton
                                 fullWidth
                                 onClick={() => setOpenPasswordDialog(true)}
                                 disabled={updating || changePasswordMutation.isPending}
-                                size="large"
+                                size="small"
+                                sx={{ fontSize: '0.8rem', py: 0.6 }}
                             >
                                 Change Password
                             </OutlineButton>
@@ -552,22 +603,35 @@ export const ProfilePage = ({ roleLabel }) => {
                 fullWidth
                 PaperProps={{
                     sx: {
-                        borderRadius: 3,
+                        borderRadius: 2,
+                        backgroundColor: theme.palette.background.paper,
+                        p: 1,
                     }
                 }}
             >
                 <DialogTitle sx={{
-                    color: '#0F1115',
+                    color: TEXT_PRIMARY,
+                    fontWeight: 600,
+                    fontSize: '0.95rem',
+                    py: 1.5,
+                    px: 2,
                 }}>
-                        Change Password
+                    Change Password
                 </DialogTitle>
-                <DialogContent>
+                <DialogContent sx={{ px: 2, py: 1 }}>
                     <Box>
                         {passwordError && (
                             <Alert severity="error" sx={{
-                                borderRadius: 2,
-                                backgroundColor: alpha(RED_COLOR, 0.05),
-                                borderLeft: `4px solid ${RED_COLOR}`,
+                                borderRadius: 1,
+                                backgroundColor: theme.palette.mode === 'dark'
+                                    ? alpha(RED_COLOR, 0.1)
+                                    : alpha(RED_COLOR, 0.05),
+                                borderLeft: `3px solid ${RED_COLOR}`,
+                                color: TEXT_PRIMARY,
+                                py: 0.5,
+                                px: 1.5,
+                                mb: 1.5,
+                                '& .MuiAlert-message': { fontSize: '0.75rem' },
                             }}>
                                 {passwordError}
                             </Alert>
@@ -580,11 +644,27 @@ export const ProfilePage = ({ roleLabel }) => {
                             type="password"
                             value={passwordData.currentPassword}
                             onChange={handlePasswordChange}
-                            margin="normal"
+                            margin="dense"
                             required
                             size='small'
                             disabled={changePasswordMutation.isPending}
                             variant="outlined"
+                            sx={{
+                                '& .MuiInputBase-input': {
+                                    fontSize: '0.8rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiInputLabel-root': {
+                                    fontSize: '0.8rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiOutlinedInput-root': {
+                                    '& fieldset': {
+                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
+                                    },
+                                },
+                                mb: 1,
+                            }}
                         />
 
                         <StyledTextField
@@ -595,11 +675,31 @@ export const ProfilePage = ({ roleLabel }) => {
                             size='small'
                             value={passwordData.newPassword}
                             onChange={handlePasswordChange}
-                            margin="normal"
+                            margin="dense"
                             required
                             helperText="Password must be at least 6 characters"
                             disabled={changePasswordMutation.isPending}
                             variant="outlined"
+                            sx={{
+                                '& .MuiInputBase-input': {
+                                    fontSize: '0.8rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiInputLabel-root': {
+                                    fontSize: '0.8rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiFormHelperText-root': {
+                                    fontSize: '0.7rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiOutlinedInput-root': {
+                                    '& fieldset': {
+                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
+                                    },
+                                },
+                                mb: 1,
+                            }}
                         />
 
                         <StyledTextField
@@ -610,18 +710,35 @@ export const ProfilePage = ({ roleLabel }) => {
                             size='small'
                             value={passwordData.confirmPassword}
                             onChange={handlePasswordChange}
-                            margin="normal"
+                            margin="dense"
                             required
                             disabled={changePasswordMutation.isPending}
                             variant="outlined"
+                            sx={{
+                                '& .MuiInputBase-input': {
+                                    fontSize: '0.8rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiInputLabel-root': {
+                                    fontSize: '0.8rem',
+                                    color: TEXT_PRIMARY,
+                                },
+                                '& .MuiOutlinedInput-root': {
+                                    '& fieldset': {
+                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
+                                    },
+                                },
+                            }}
                         />
                     </Box>
                 </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 3 }}>
+                <DialogActions sx={{ px: 2, py: 1.5 }}>
                     <OutlineButton
                         onClick={handleClosePasswordDialog}
                         disabled={changePasswordMutation.isPending}
                         variant="outlined"
+                        size="small"
+                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
                     >
                         Cancel
                     </OutlineButton>
@@ -629,6 +746,8 @@ export const ProfilePage = ({ roleLabel }) => {
                         onClick={handleChangePassword}
                         variant="contained"
                         disabled={changePasswordMutation.isPending}
+                        size="small"
+                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
                     >
                         {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
                     </GradientButton>
@@ -646,16 +765,26 @@ export const ProfilePage = ({ roleLabel }) => {
                     severity="success"
                     sx={{
                         width: '100%',
-                        borderRadius: 2,
-                        backgroundColor: alpha(GREEN_COLOR, 0.05),
-                        borderLeft: `4px solid ${GREEN_COLOR}`,
+                        borderRadius: 1,
+                        backgroundColor: theme.palette.mode === 'dark'
+                            ? alpha(GREEN_COLOR, 0.1)
+                            : alpha(GREEN_COLOR, 0.05),
+                        borderLeft: `3px solid ${GREEN_COLOR}`,
                         '& .MuiAlert-icon': {
                             color: GREEN_COLOR,
+                            fontSize: '0.9rem',
                         },
+                        '& .MuiAlert-message': {
+                            fontSize: '0.8rem',
+                            py: 0.5,
+                        },
+                        color: TEXT_PRIMARY,
+                        py: 0.5,
+                        px: 1.5,
                     }}
-                    elevation={6}
+                    elevation={4}
                 >
-                    <Typography fontWeight={500}>{success}</Typography>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
@@ -670,16 +799,26 @@ export const ProfilePage = ({ roleLabel }) => {
                     severity="error"
                     sx={{
                         width: '100%',
-                        borderRadius: 2,
-                        backgroundColor: alpha(RED_COLOR, 0.05),
-                        borderLeft: `4px solid ${RED_COLOR}`,
+                        borderRadius: 1,
+                        backgroundColor: theme.palette.mode === 'dark'
+                            ? alpha(RED_COLOR, 0.1)
+                            : alpha(RED_COLOR, 0.05),
+                        borderLeft: `3px solid ${RED_COLOR}`,
                         '& .MuiAlert-icon': {
                             color: RED_COLOR,
+                            fontSize: '0.9rem',
                         },
+                        '& .MuiAlert-message': {
+                            fontSize: '0.8rem',
+                            py: 0.5,
+                        },
+                        color: TEXT_PRIMARY,
+                        py: 0.5,
+                        px: 1.5,
                     }}
-                    elevation={6}
+                    elevation={4}
                 >
-                    <Typography fontWeight={500}>{error}</Typography>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{error}</Typography>
                 </Alert>
             </Snackbar>
         </Box>
