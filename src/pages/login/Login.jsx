@@ -85,7 +85,7 @@ export const Login = () => {
                 fontSize: '1.85rem',
               }}
             >
-              Sterling
+              Finance Management
             </Typography>
             <Typography sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>
               Sign in to your account
