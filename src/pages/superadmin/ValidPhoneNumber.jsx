@@ -228,7 +228,6 @@ export default function ValidPhoneNumber() {
                     size="small"
                     fullWidth
                     sx={{
-                        maxWidth: 400,
                         '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY },
                     }}
                 />
