@@ -73,8 +73,7 @@ export const ProfilePage = ({ roleLabel }) => {
         queryKey: ['userProfile', user?.id],
         queryFn: async () => {
             const response = await axiosInstance.get('/auth/me');
-            const userData = response.data.user || response.data.data || response.data;
-            return userData;
+            return response.data.user || response.data.data || response.data;
         },
         enabled: !!user?.id,
         retry: 1,
@@ -347,10 +346,6 @@ export const ProfilePage = ({ roleLabel }) => {
                         fontWeight: 600,
                         mb: 0.5,
                         fontSize: '1.1rem',
-                        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
                     }}>
                         My Profile
                     </Typography>
@@ -358,18 +353,7 @@ export const ProfilePage = ({ roleLabel }) => {
                         Manage your account settings and preferences
                     </Typography>
                 </Box>
-                {!isEditing ? (
-                    <GradientButton
-                        variant="contained"
-                        startIcon={<EditIcon sx={{ fontSize: '0.9rem' }} />}
-                        onClick={() => setIsEditing(true)}
-                        disabled={updating}
-                        size={isMobile ? "small" : "small"}
-                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
-                    >
-                        Edit Profile
-                    </GradientButton>
-                ) : (
+                {isEditing ? (
                     <Box display="flex" gap={1.5}>
                         <OutlineButton
                             startIcon={<CancelIcon sx={{ fontSize: '0.9rem' }} />}
@@ -391,6 +375,17 @@ export const ProfilePage = ({ roleLabel }) => {
                             {updating ? 'Saving...' : 'Save Changes'}
                         </GradientButton>
                     </Box>
+                ) : (
+                    <GradientButton
+                        variant="contained"
+                        startIcon={<EditIcon sx={{ fontSize: '0.9rem' }} />}
+                        onClick={() => setIsEditing(true)}
+                        disabled={updating}
+                        size={isMobile ? "small" : "small"}
+                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
+                    >
+                        Edit Profile
+                    </GradientButton>
                 )}
             </Box>
 

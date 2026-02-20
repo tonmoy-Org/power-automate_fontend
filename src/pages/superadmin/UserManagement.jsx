@@ -46,16 +46,17 @@ import GradientButton from '../../components/ui/GradientButton';
 import OutlineButton from '../../components/ui/OutlineButton';
 import StyledTextField from '../../components/ui/StyledTextField';
 import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../../auth/AuthProvider';
 
 export const UserManagement = () => {
     const queryClient = useQueryClient();
     const theme = useTheme();
+    const { user: currentUser } = useAuth();
 
-    // Use theme colors
     const BLUE_COLOR = theme.palette.primary.main;
-    const BLUE_DARK = theme.palette.primary.dark || theme.palette.primary.main;
+    const BLUE_DARK = theme.palette.primary.dark;
     const RED_COLOR = theme.palette.error.main;
-    const RED_DARK = theme.palette.error.dark || theme.palette.error.main;
+    const RED_DARK = theme.palette.error.dark;
     const GREEN_COLOR = theme.palette.success.main;
     const TEXT_PRIMARY = theme.palette.text.primary;
 
@@ -76,7 +77,6 @@ export const UserManagement = () => {
         isActive: true,
     });
 
-    // Pagination state
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -88,10 +88,8 @@ export const UserManagement = () => {
         },
     });
 
-    // Filter users based on search query
     const filteredUsers = useMemo(() => {
         if (!searchQuery.trim()) return users;
-
         const query = searchQuery.toLowerCase();
         return users.filter(user =>
             user.name?.toLowerCase().includes(query) ||
@@ -100,7 +98,6 @@ export const UserManagement = () => {
         );
     }, [users, searchQuery]);
 
-    // Pagination logic
     const paginatedUsers = useMemo(() => {
         return filteredUsers.slice(
             page * rowsPerPage,
@@ -108,10 +105,8 @@ export const UserManagement = () => {
         );
     }, [filteredUsers, page, rowsPerPage]);
 
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
+    const handleChangePage = (event, newPage) => setPage(newPage);
+    
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
@@ -124,15 +119,13 @@ export const UserManagement = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
-            setSuccess('User created successfully!');
+            setSuccess('User created successfully');
             setOpenDialog(false);
             resetForm();
-            setTimeout(() => setSuccess(''), 3000);
             setPage(0);
         },
         onError: (err) => {
             setError(err.response?.data?.message || 'Failed to create user');
-            setTimeout(() => setError(''), 3000);
         },
     });
 
@@ -143,10 +136,9 @@ export const UserManagement = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
-            setSuccess('User deleted successfully!');
+            setSuccess('User deleted successfully');
             setOpenDeleteDialog(false);
             setUserToDelete(null);
-            setTimeout(() => setSuccess(''), 3000);
             if (paginatedUsers.length === 1 && page > 0) {
                 setPage(page - 1);
             }
@@ -155,7 +147,6 @@ export const UserManagement = () => {
             setError(err.response?.data?.message || 'Failed to delete user');
             setOpenDeleteDialog(false);
             setUserToDelete(null);
-            setTimeout(() => setError(''), 3000);
         },
     });
 
@@ -166,14 +157,12 @@ export const UserManagement = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
-            setSuccess('User updated successfully!');
+            setSuccess('User updated successfully');
             setOpenDialog(false);
             resetForm();
-            setTimeout(() => setSuccess(''), 3000);
         },
         onError: (err) => {
             setError(err.response?.data?.message || 'Failed to update user');
-            setTimeout(() => setError(''), 3000);
         },
     });
 
@@ -184,16 +173,14 @@ export const UserManagement = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['users'] });
-            setSuccess('User status updated successfully!');
+            setSuccess('User status updated successfully');
             setOpenStatusDialog(false);
             setUserToToggle(null);
-            setTimeout(() => setSuccess(''), 3000);
         },
         onError: (err) => {
             setError(err.response?.data?.message || 'Failed to update user status');
             setOpenStatusDialog(false);
             setUserToToggle(null);
-            setTimeout(() => setError(''), 3000);
         },
     });
 
@@ -201,10 +188,10 @@ export const UserManagement = () => {
         if (user) {
             setSelectedUser(user);
             setFormData({
-                name: user.name,
-                email: user.email,
+                name: user.name || '',
+                email: user.email || '',
                 password: '',
-                role: user.role,
+                role: user.role || 'member',
                 isActive: user.isActive !== undefined ? user.isActive : true,
             });
         } else {
@@ -253,17 +240,11 @@ export const UserManagement = () => {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSwitchChange = (e) => {
-        setFormData(prev => ({
-            ...prev,
-            isActive: e.target.checked
-        }));
+        setFormData(prev => ({ ...prev, isActive: e.target.checked }));
     };
 
     const handleSubmit = () => {
@@ -282,25 +263,19 @@ export const UserManagement = () => {
         switch (role) {
             case 'superadmin':
                 return {
-                    backgroundColor: theme.palette.mode === 'dark'
-                        ? alpha(RED_COLOR, 0.2)
-                        : alpha(RED_COLOR, 0.1),
+                    backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.2 : 0.1),
                     color: RED_COLOR,
                     borderColor: RED_COLOR,
                 };
             case 'member':
                 return {
-                    backgroundColor: theme.palette.mode === 'dark'
-                        ? alpha(BLUE_COLOR, 0.2)
-                        : alpha(BLUE_COLOR, 0.1),
+                    backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.2 : 0.1),
                     color: BLUE_COLOR,
                     borderColor: BLUE_COLOR,
                 };
             case 'client':
                 return {
-                    backgroundColor: theme.palette.mode === 'dark'
-                        ? alpha(GREEN_COLOR, 0.2)
-                        : alpha(GREEN_COLOR, 0.1),
+                    backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.2 : 0.1),
                     color: GREEN_COLOR,
                     borderColor: GREEN_COLOR,
                 };
@@ -309,34 +284,20 @@ export const UserManagement = () => {
         }
     };
 
-    const getStatusStyle = (isActive) => {
-        if (isActive) {
-            return {
-                backgroundColor: theme.palette.mode === 'dark'
-                    ? alpha(GREEN_COLOR, 0.2)
-                    : alpha(GREEN_COLOR, 0.1),
-                color: GREEN_COLOR,
-                borderColor: GREEN_COLOR,
-            };
-        } else {
-            return {
-                backgroundColor: theme.palette.mode === 'dark'
-                    ? alpha(RED_COLOR, 0.2)
-                    : alpha(RED_COLOR, 0.1),
-                color: RED_COLOR,
-                borderColor: RED_COLOR,
-            };
-        }
-    };
+    const getStatusStyle = (isActive) => ({
+        backgroundColor: alpha(isActive ? GREEN_COLOR : RED_COLOR, theme.palette.mode === 'dark' ? 0.2 : 0.1),
+        color: isActive ? GREEN_COLOR : RED_COLOR,
+        borderColor: isActive ? GREEN_COLOR : RED_COLOR,
+    });
 
-    const getStatusLabel = (isActive) => {
-        return isActive ? 'Active' : 'Inactive';
-    };
+    const getStatusLabel = (isActive) => isActive ? 'Active' : 'Inactive';
+
+    const isCurrentUser = (userId) => currentUser?.id === userId;
 
     if (isLoading) {
         return (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress sx={{ color: BLUE_COLOR, size: 'small' }} />
+                <CircularProgress sx={{ color: BLUE_COLOR }} />
             </Box>
         );
     }
@@ -344,19 +305,18 @@ export const UserManagement = () => {
     return (
         <Box>
             <Helmet>
-                <title>User management | Power Automate</title>
-                <meta name="description" content="Super administrator user management dashboard" />
+                <title>User Management | Power Automate</title>
             </Helmet>
-            <Box sx={{ display: { xs: '', lg: 'flex' } }} justifyContent="space-between" alignItems="center" mb={2}>
-                <Box mb={1}>
+
+            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={3}>
+                <Box>
                     <Typography sx={{
                         fontWeight: 600,
                         mb: 0.5,
-                        fontSize: '1.1rem',
+                        fontSize: { xs: '1rem', sm: '1.1rem' },
                         background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
                     }}>
                         User Management
                     </Typography>
@@ -369,14 +329,14 @@ export const UserManagement = () => {
                     startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />}
                     onClick={() => handleOpenDialog()}
                     size="small"
-                    sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
+                    sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }}
+                    disabled={createUserMutation.isPending}
                 >
                     Add User
                 </GradientButton>
             </Box>
 
-            {/* Search Bar */}
-            <Box mb={2}>
+            <Box mb={3}>
                 <StyledTextField
                     fullWidth
                     placeholder="Search users by name, email, or role..."
@@ -386,27 +346,7 @@ export const UserManagement = () => {
                         startAdornment: <SearchIcon sx={{ mr: 1, color: TEXT_PRIMARY, fontSize: '0.9rem', opacity: 0.7 }} />,
                     }}
                     size="small"
-                    sx={{
-                        '& .MuiInputBase-input': {
-                            fontSize: '0.8rem',
-                            color: TEXT_PRIMARY,
-                        },
-                        '& .MuiOutlinedInput-root': {
-                            '&:hover fieldset': {
-                                borderColor: BLUE_COLOR,
-                            },
-                            '&.Mui-focused fieldset': {
-                                borderColor: BLUE_COLOR,
-                            },
-                            '& input::placeholder': {
-                                color: TEXT_PRIMARY,
-                                opacity: 0.6,
-                            },
-                        },
-                        '& .MuiInputLabel-root': {
-                            color: TEXT_PRIMARY,
-                        },
-                    }}
+                    sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY } }}
                 />
             </Box>
 
@@ -417,219 +357,172 @@ export const UserManagement = () => {
                     borderRadius: 1.5,
                     border: `1px solid ${theme.palette.divider}`,
                     backgroundColor: theme.palette.background.paper,
-                    overflow: 'hidden',
+                    overflow: 'auto',
+                    minHeight: 400,
                 }}
             >
-                <Table size="small">
+                <Table size="medium">
                     <TableHead>
                         <TableRow sx={{
-                            backgroundColor: theme.palette.mode === 'dark'
-                                ? alpha(BLUE_COLOR, 0.1)
-                                : alpha(BLUE_COLOR, 0.05),
+                            backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05)
                         }}>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${BLUE_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>
-                                Name
-                            </TableCell>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${BLUE_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>
-                                Email
-                            </TableCell>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${BLUE_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>
-                                Role
-                            </TableCell>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${BLUE_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>
-                                Status
-                            </TableCell>
-                            <TableCell align="right" sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${BLUE_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>
-                                Actions
-                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Name</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Email</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Role</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Status</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {paginatedUsers.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                                    <Box py={2}>
-                                        <PersonIcon sx={{ fontSize: 32, color: alpha(TEXT_PRIMARY, 0.2), mb: 1.5 }} />
-                                        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: TEXT_PRIMARY }}>
-                                            {searchQuery ? 'No users found matching your search.' : 'No users found. Create one to get started.'}
+                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                    <Box py={3}>
+                                        <PersonIcon sx={{ fontSize: 48, color: alpha(TEXT_PRIMARY, 0.2), mb: 2 }} />
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
+                                            {searchQuery ? 'No users found matching your search' : 'No users found. Add one to get started'}
                                         </Typography>
                                     </Box>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            paginatedUsers.map((user) => (
-                                <TableRow
-                                    key={user._id}
-                                    hover
-                                    sx={{
-                                        '&:hover': {
-                                            backgroundColor: theme.palette.mode === 'dark'
-                                                ? alpha(BLUE_COLOR, 0.05)
-                                                : alpha(BLUE_COLOR, 0.03),
-                                        },
-                                        '&:last-child td': {
-                                            borderBottom: 0,
-                                        },
-                                    }}
-                                >
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <Box sx={{
-                                                width: 28,
-                                                height: 28,
-                                                borderRadius: '50%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                background: `linear-gradient(135deg, ${BLUE_COLOR} 0%, ${BLUE_DARK} 100%)`,
-                                                color: 'white',
-                                                fontWeight: 600,
-                                                fontSize: '0.75rem',
-                                            }}>
-                                                {user.name?.charAt(0).toUpperCase()}
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                                    {user.name}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ fontSize: '0.7rem', display: 'block', color: TEXT_PRIMARY, opacity: 0.7 }}>
-                                                    ID: {user._id?.substring(0, 8)}...
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Typography variant="caption" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                            {user.email}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Chip
-                                            label={user.role.toUpperCase()}
-                                            size="small"
-                                            sx={{
-                                                fontWeight: 500,
-                                                fontSize: '0.7rem',
-                                                height: 20,
-                                                ...getRoleStyle(user.role),
-                                                '& .MuiChip-label': {
-                                                    px: 1,
-                                                },
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Chip
-                                            label={getStatusLabel(user.isActive)}
-                                            size="small"
-                                            variant="outlined"
-                                            icon={user.isActive ?
-                                                <CheckCircleIcon sx={{ fontSize: '0.7rem' }} /> :
-                                                <BlockIcon sx={{ fontSize: '0.7rem' }} />
-                                            }
-                                            sx={{
-                                                fontWeight: 500,
-                                                fontSize: '0.7rem',
-                                                height: 20,
-                                                ...getStatusStyle(user.isActive),
-                                                '& .MuiChip-label': {
-                                                    px: 1,
-                                                },
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ py: 1 }}>
-                                        <Tooltip title="Edit User">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleOpenDialog(user)}
-                                                disabled={user.role === 'superadmin'}
-                                                sx={{
-                                                    color: BLUE_COLOR,
+                            paginatedUsers.map((user) => {
+                                const isOwnAccount = isCurrentUser(user._id);
+                                return (
+                                    <TableRow
+                                        key={user._id}
+                                        hover
+                                        sx={{
+                                            '&:hover': { backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.05 : 0.03) },
+                                            '&:last-child td': { borderBottom: 0 },
+                                            opacity: (deleteUserMutation.isPending && userToDelete?._id === user._id) ? 0.5 : 1,
+                                        }}
+                                    >
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Box display="flex" alignItems="center" gap={1.5}>
+                                                <Box sx={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    background: `linear-gradient(135deg, ${BLUE_COLOR} 0%, ${BLUE_DARK} 100%)`,
+                                                    color: 'white',
+                                                    fontWeight: 600,
                                                     fontSize: '0.8rem',
-                                                    '&:hover': {
-                                                        backgroundColor: alpha(BLUE_COLOR, 0.1),
-                                                    },
-                                                }}
-                                            >
-                                                <EditIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title={user.isActive ? "Deactivate User" : "Activate User"}>
-                                            <IconButton
+                                                }}>
+                                                    {user.name?.charAt(0).toUpperCase()}
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
+                                                        {user.name}
+                                                        {isOwnAccount && (
+                                                            <Chip
+                                                                label="You"
+                                                                size="small"
+                                                                sx={{
+                                                                    ml: 1,
+                                                                    backgroundColor: alpha(BLUE_COLOR, 0.1),
+                                                                    color: BLUE_COLOR,
+                                                                    fontSize: '0.65rem',
+                                                                    height: 18,
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ fontSize: '0.7rem', display: 'block', color: alpha(TEXT_PRIMARY, 0.7) }}>
+                                                        ID: {user._id?.substring(0, 8)}...
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
+                                                {user.email}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Chip
+                                                label={user.role.toUpperCase()}
                                                 size="small"
-                                                onClick={() => handleToggleStatusClick(user)}
-                                                disabled={user.role === 'superadmin' || user._id === 'current-user-id'}
                                                 sx={{
-                                                    color: user.isActive ? RED_COLOR : GREEN_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': {
-                                                        backgroundColor: user.isActive ?
-                                                            alpha(RED_COLOR, 0.1) :
-                                                            alpha(GREEN_COLOR, 0.1),
-                                                    },
+                                                    fontWeight: 500,
+                                                    fontSize: '0.75rem',
+                                                    height: 24,
+                                                    ...getRoleStyle(user.role),
                                                 }}
-                                            >
-                                                {user.isActive ?
-                                                    <BlockIcon fontSize="inherit" /> :
-                                                    <CheckCircleIcon fontSize="inherit" />
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Chip
+                                                label={getStatusLabel(user.isActive)}
+                                                size="small"
+                                                variant="outlined"
+                                                icon={user.isActive ?
+                                                    <CheckCircleIcon sx={{ fontSize: '0.75rem' }} /> :
+                                                    <BlockIcon sx={{ fontSize: '0.75rem' }} />
                                                 }
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Delete User">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleDeleteClick(user)}
-                                                disabled={user.role === 'superadmin' || user._id === 'current-user-id'}
                                                 sx={{
-                                                    color: RED_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': {
-                                                        backgroundColor: alpha(RED_COLOR, 0.1),
-                                                    },
+                                                    fontWeight: 500,
+                                                    fontSize: '0.75rem',
+                                                    height: 24,
+                                                    ...getStatusStyle(user.isActive),
                                                 }}
-                                            >
-                                                <DeleteIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ py: 1.5 }}>
+                                            <Tooltip title={isOwnAccount ? "Cannot edit your own account" : "Edit User"}>
+                                                <span>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleOpenDialog(user)}
+                                                        disabled={isOwnAccount}
+                                                        sx={{ color: BLUE_COLOR, fontSize: '0.9rem', mr: 0.5 }}
+                                                    >
+                                                        <EditIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                            <Tooltip title={isOwnAccount ? "Cannot change your own status" : (user.isActive ? "Deactivate User" : "Activate User")}>
+                                                <span>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleToggleStatusClick(user)}
+                                                        disabled={isOwnAccount}
+                                                        sx={{
+                                                            color: user.isActive ? RED_COLOR : GREEN_COLOR,
+                                                            fontSize: '0.9rem',
+                                                            mr: 0.5,
+                                                        }}
+                                                    >
+                                                        {user.isActive ?
+                                                            <BlockIcon fontSize="inherit" /> :
+                                                            <CheckCircleIcon fontSize="inherit" />
+                                                        }
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                            <Tooltip title={isOwnAccount ? "Cannot delete your own account" : "Delete User"}>
+                                                <span>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleDeleteClick(user)}
+                                                        disabled={isOwnAccount}
+                                                        sx={{ color: RED_COLOR, fontSize: '0.9rem' }}
+                                                    >
+                                                        <DeleteIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                </span>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
 
-                {/* Pagination */}
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
@@ -641,78 +534,40 @@ export const UserManagement = () => {
                     sx={{
                         borderTop: `1px solid ${theme.palette.divider}`,
                         '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                            fontSize: '0.75rem',
-                            color: TEXT_PRIMARY,
-                        },
-                        '& .MuiTablePagination-actions': {
-                            '& .MuiIconButton-root': {
-                                fontSize: '0.8rem',
-                                '&:hover': {
-                                    backgroundColor: alpha(BLUE_COLOR, 0.1),
-                                },
-                            },
-                        },
-                        '& .MuiSelect-select': {
                             fontSize: '0.8rem',
-                            padding: '4px 32px 4px 12px',
-                            color: TEXT_PRIMARY,
-                        },
-                        '& .MuiSvgIcon-root': {
                             color: TEXT_PRIMARY,
                         },
                     }}
-                    size="small"
                 />
             </TableContainer>
 
-            {/* Add/Edit User Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={handleCloseDialog}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{
-                    color: TEXT_PRIMARY,
-                    fontWeight: 600,
-                    fontSize: '0.95rem',
-                    py: 1.5,
-                    px: 2,
+                <DialogTitle sx={{ 
+                    color: TEXT_PRIMARY, 
+                    fontWeight: 600, 
+                    fontSize: '1rem', 
+                    py: 2, 
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
                     {selectedUser ? 'Edit User' : 'Add New User'}
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
                         <StyledTextField
                             fullWidth
                             label="Name"
                             name="name"
                             value={formData.name}
                             onChange={handleInputChange}
-                            required
                             size="small"
-                            sx={{
-                                '& .MuiInputBase-input': {
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                },
-                                '& .MuiInputLabel-root': {
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                },
-                                '& .MuiOutlinedInput-root': {
-                                    '& fieldset': {
-                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
-                                    },
-                                },
-                            }}
+                            placeholder="Enter full name"
                         />
                         <StyledTextField
                             fullWidth
@@ -721,23 +576,8 @@ export const UserManagement = () => {
                             type="email"
                             value={formData.email}
                             onChange={handleInputChange}
-                            required
                             size="small"
-                            sx={{
-                                '& .MuiInputBase-input': {
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                },
-                                '& .MuiInputLabel-root': {
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                },
-                                '& .MuiOutlinedInput-root': {
-                                    '& fieldset': {
-                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
-                                    },
-                                },
-                            }}
+                            placeholder="Enter email address"
                         />
                         <StyledTextField
                             fullWidth
@@ -746,62 +586,21 @@ export const UserManagement = () => {
                             type="password"
                             value={formData.password}
                             onChange={handleInputChange}
-                            required={!selectedUser}
                             size="small"
-                            sx={{
-                                '& .MuiInputBase-input': {
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                },
-                                '& .MuiInputLabel-root': {
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                },
-                                '& .MuiOutlinedInput-root': {
-                                    '& fieldset': {
-                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
-                                    },
-                                },
-                            }}
+                            placeholder={selectedUser ? 'Enter new password' : 'Enter password'}
                         />
                         <FormControl fullWidth size="small">
-                            <InputLabel
-                                sx={{
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                    '&.Mui-focused': { color: BLUE_COLOR },
-                                }}
-                            >
-                                Role
-                            </InputLabel>
+                            <InputLabel sx={{ fontSize: '0.85rem' }}>Role</InputLabel>
                             <Select
                                 name="role"
                                 value={formData.role}
                                 onChange={handleInputChange}
                                 label="Role"
-                                sx={{
-                                    fontSize: '0.8rem',
-                                    color: TEXT_PRIMARY,
-                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                                        borderColor: BLUE_COLOR,
-                                    },
-                                    '& .MuiOutlinedInput-notchedOutline': {
-                                        borderColor: alpha(TEXT_PRIMARY, 0.3),
-                                    },
-                                    '& .MuiSvgIcon-root': {
-                                        color: TEXT_PRIMARY,
-                                    },
-                                }}
+                                sx={{ fontSize: '0.85rem' }}
                             >
-                                <MenuItem value="member" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                    Member
-                                </MenuItem>
-                                <MenuItem value="superadmin" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                    Admin
-                                </MenuItem>
-                                <MenuItem value="client" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                    Client
-                                </MenuItem>
+                                <MenuItem value="member" sx={{ fontSize: '0.85rem' }}>Member</MenuItem>
+                                <MenuItem value="superadmin" sx={{ fontSize: '0.85rem' }}>Admin</MenuItem>
+                                <MenuItem value="client" sx={{ fontSize: '0.85rem' }}>Client</MenuItem>
                             </Select>
                         </FormControl>
                         {selectedUser && (
@@ -816,7 +615,7 @@ export const UserManagement = () => {
                                     />
                                 }
                                 label={
-                                    <Typography variant="caption" fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                    <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
                                         Active
                                     </Typography>
                                 }
@@ -824,11 +623,12 @@ export const UserManagement = () => {
                         )}
                     </Box>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
                         onClick={handleCloseDialog}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
+                        disabled={createUserMutation.isPending || updateUserMutation.isPending}
                     >
                         Cancel
                     </OutlineButton>
@@ -842,54 +642,50 @@ export const UserManagement = () => {
                             !formData.email ||
                             (!selectedUser && !formData.password)
                         }
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                     >
-                        {selectedUser ? 'Update User' : 'Create User'}
+                        {createUserMutation.isPending || updateUserMutation.isPending ? (
+                            <CircularProgress size={18} sx={{ color: 'white' }} />
+                        ) : (
+                            selectedUser ? 'Update' : 'Create'
+                        )}
                     </GradientButton>
                 </DialogActions>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={openDeleteDialog}
                 onClose={() => setOpenDeleteDialog(false)}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{
-                    pb: 1,
-                    color: RED_COLOR,
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    py: 1.5,
-                    px: 2,
+                <DialogTitle sx={{ 
+                    color: RED_COLOR, 
+                    fontWeight: 600, 
+                    fontSize: '1rem', 
+                    py: 2, 
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                        <DeleteIcon sx={{ fontSize: '0.9rem' }} />
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <DeleteIcon sx={{ fontSize: '1.1rem' }} />
                         Confirm Delete
                     </Box>
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Box py={0.5}>
-                        <DialogContentText sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                            Are you sure you want to delete the user <strong>"{userToDelete?.name}"</strong>?
-                            This action cannot be undone.
-                        </DialogContentText>
-                    </Box>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <DialogContentText sx={{ fontSize: '0.9rem', color: TEXT_PRIMARY }}>
+                        Are you sure you want to delete the user <strong>"{userToDelete?.name}"</strong>?
+                        This action cannot be undone.
+                    </DialogContentText>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
                         onClick={() => setOpenDeleteDialog(false)}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
+                        disabled={deleteUserMutation.isPending}
                     >
                         Cancel
                     </OutlineButton>
@@ -899,67 +695,57 @@ export const UserManagement = () => {
                             background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
                             color: 'white',
                             borderRadius: 1,
-                            padding: '4px 16px',
+                            padding: '6px 16px',
                             fontWeight: 500,
-                            fontSize: '0.8rem',
+                            fontSize: '0.85rem',
                             textTransform: 'none',
-                            '&:hover': {
-                                background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)`,
-                            },
+                            '&:hover': { background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)` },
                         }}
                         onClick={handleDeleteConfirm}
+                        startIcon={deleteUserMutation.isPending ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <DeleteIcon sx={{ fontSize: '0.9rem' }} />}
+                        size="medium"
                         disabled={deleteUserMutation.isPending}
-                        startIcon={<DeleteIcon sx={{ fontSize: '0.8rem' }} />}
-                        size="small"
                     >
-                        {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+                        {deleteUserMutation.isPending ? 'Deleting...' : 'Delete'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Toggle Status Confirmation Dialog */}
             <Dialog
                 open={openStatusDialog}
                 onClose={() => setOpenStatusDialog(false)}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{
-                    pb: 1,
+                <DialogTitle sx={{ 
                     color: userToToggle?.isActive ? RED_COLOR : GREEN_COLOR,
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    py: 1.5,
-                    px: 2,
+                    fontWeight: 600, 
+                    fontSize: '1rem', 
+                    py: 2, 
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
+                    <Box display="flex" alignItems="center" gap={1}>
                         {userToToggle?.isActive ?
-                            <BlockIcon sx={{ fontSize: '0.9rem' }} /> :
-                            <CheckCircleIcon sx={{ fontSize: '0.9rem' }} />
+                            <BlockIcon sx={{ fontSize: '1.1rem' }} /> :
+                            <CheckCircleIcon sx={{ fontSize: '1.1rem' }} />
                         }
                         Confirm Status Change
                     </Box>
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Box py={0.5}>
-                        <DialogContentText sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                            Are you sure you want to {userToToggle?.isActive ? 'deactivate' : 'activate'}
-                            the user <strong>"{userToToggle?.name}"</strong>?
-                        </DialogContentText>
-                    </Box>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <DialogContentText sx={{ fontSize: '0.9rem', color: TEXT_PRIMARY }}>
+                        Are you sure you want to {userToToggle?.isActive ? 'deactivate' : 'activate'}
+                        the user <strong>"{userToToggle?.name}"</strong>?
+                    </DialogContentText>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
                         onClick={() => setOpenStatusDialog(false)}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
+                        disabled={toggleUserStatusMutation.isPending}
                     >
                         Cancel
                     </OutlineButton>
@@ -967,15 +753,15 @@ export const UserManagement = () => {
                         variant="contained"
                         onClick={handleToggleStatusConfirm}
                         disabled={toggleUserStatusMutation.isPending}
-                        startIcon={userToToggle?.isActive ?
-                            <BlockIcon sx={{ fontSize: '0.8rem' }} /> :
-                            <CheckCircleIcon sx={{ fontSize: '0.8rem' }} />
+                        startIcon={toggleUserStatusMutation.isPending ? 
+                            <CircularProgress size={18} sx={{ color: 'white' }} /> : 
+                            (userToToggle?.isActive ? <BlockIcon sx={{ fontSize: '0.9rem' }} /> : <CheckCircleIcon sx={{ fontSize: '0.9rem' }} />)
                         }
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                     >
                         {toggleUserStatusMutation.isPending ? 'Updating...' :
-                            userToToggle?.isActive ? 'Deactivate User' : 'Activate User'}
+                            userToToggle?.isActive ? 'Deactivate' : 'Activate'}
                     </GradientButton>
                 </DialogActions>
             </Dialog>
@@ -986,30 +772,18 @@ export const UserManagement = () => {
                 onClose={() => setSuccess('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert
-                    severity="success"
-                    sx={{
-                        width: '100%',
-                        borderRadius: 1,
-                        backgroundColor: theme.palette.mode === 'dark'
-                            ? alpha(GREEN_COLOR, 0.1)
-                            : alpha(GREEN_COLOR, 0.05),
-                        borderLeft: `3px solid ${GREEN_COLOR}`,
-                        '& .MuiAlert-icon': {
-                            color: GREEN_COLOR,
-                            fontSize: '0.9rem',
-                        },
-                        '& .MuiAlert-message': {
-                            fontSize: '0.8rem',
-                            py: 0.5,
-                        },
-                        color: TEXT_PRIMARY,
-                        py: 0.5,
-                        px: 1.5,
-                    }}
-                    elevation={4}
-                >
-                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{success}</Typography>
+                <Alert severity="success" sx={{
+                    width: '100%',
+                    borderRadius: 1,
+                    backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                    borderLeft: `3px solid ${GREEN_COLOR}`,
+                    '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '1rem' },
+                    '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
+                    color: TEXT_PRIMARY,
+                    py: 0.5,
+                    px: 2,
+                }} elevation={4}>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
@@ -1019,30 +793,18 @@ export const UserManagement = () => {
                 onClose={() => setError('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert
-                    severity="error"
-                    sx={{
-                        width: '100%',
-                        borderRadius: 1,
-                        backgroundColor: theme.palette.mode === 'dark'
-                            ? alpha(RED_COLOR, 0.1)
-                            : alpha(RED_COLOR, 0.05),
-                        borderLeft: `3px solid ${RED_COLOR}`,
-                        '& .MuiAlert-icon': {
-                            color: RED_COLOR,
-                            fontSize: '0.9rem',
-                        },
-                        '& .MuiAlert-message': {
-                            fontSize: '0.8rem',
-                            py: 0.5,
-                        },
-                        color: TEXT_PRIMARY,
-                        py: 0.5,
-                        px: 1.5,
-                    }}
-                    elevation={4}
-                >
-                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{error}</Typography>
+                <Alert severity="error" sx={{
+                    width: '100%',
+                    borderRadius: 1,
+                    backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                    borderLeft: `3px solid ${RED_COLOR}`,
+                    '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '1rem' },
+                    '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
+                    color: TEXT_PRIMARY,
+                    py: 0.5,
+                    px: 2,
+                }} elevation={4}>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{error}</Typography>
                 </Alert>
             </Snackbar>
         </Box>

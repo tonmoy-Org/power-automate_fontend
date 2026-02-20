@@ -16,6 +16,7 @@ import {
     Tooltip,
     Divider,
     Pagination,
+    CircularProgress,
 } from '@mui/material';
 import {
     Download as DownloadIcon,
@@ -27,13 +28,11 @@ import { Helmet } from 'react-helmet-async';
 
 const CARDS_PER_PAGE = 9;
 
-// API function
 const fetchPhoneCredentials = async () => {
     const response = await axiosInstance.get('/phone-credentials');
     return response.data;
 };
 
-// Group credentials by pa_id
 const groupByPaId = (credentials) => {
     return credentials.reduce((groups, credential) => {
         const paId = credential.pa_id;
@@ -43,7 +42,6 @@ const groupByPaId = (credentials) => {
     }, {});
 };
 
-// Download text file
 const downloadTxtFile = (content, filename) => {
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -56,7 +54,6 @@ const downloadTxtFile = (content, filename) => {
     URL.revokeObjectURL(url);
 };
 
-// Generate phone:password content for specific type
 const generateTypeContent = (credentials, type) => {
     return credentials
         .filter((cred) => cred.type === type)
@@ -64,15 +61,14 @@ const generateTypeContent = (credentials, type) => {
         .join('\n');
 };
 
-export default function PhoneCredential() {
+export default function ValidPhoneNumber() {
     const theme = useTheme();
 
-    // Theme colors
     const BLUE_COLOR = theme.palette.primary.main;
-    const BLUE_DARK = theme.palette.primary.dark || theme.palette.primary.main;
     const RED_COLOR = theme.palette.error.main;
-    const RED_DARK = theme.palette.error.dark || theme.palette.error.main;
     const GREEN_COLOR = theme.palette.success.main;
+    const WARNING_COLOR = theme.palette.warning.main;
+    const WARNING_DARK = theme.palette.warning.dark;
     const TEXT_PRIMARY = theme.palette.text.primary;
     const GREY_COLOR = theme.palette.grey[500];
 
@@ -95,17 +91,6 @@ export default function PhoneCredential() {
         return [...new Set(credentials.map((cred) => cred.type))].sort();
     }, [credentials]);
 
-    const statistics = useMemo(() => {
-        if (!credentials) return { totalPaIds: 0, totalCredentials: 0, typeCounts: {} };
-        const totalCredentials = credentials.length;
-        const totalPaIds = Object.keys(groupByPaId(credentials)).length;
-        const typeCounts = uniqueTypes.reduce((acc, type) => {
-            acc[type] = credentials.filter((cred) => cred.type === type).length;
-            return acc;
-        }, {});
-        return { totalPaIds, totalCredentials, typeCounts };
-    }, [credentials, uniqueTypes]);
-
     const filteredAndGroupedCredentials = useMemo(() => {
         if (!credentials) return {};
         let filtered = credentials;
@@ -121,7 +106,6 @@ export default function PhoneCredential() {
         return groupByPaId(filtered);
     }, [credentials, searchQuery]);
 
-    // Paginated entries
     const allEntries = Object.entries(filteredAndGroupedCredentials);
     const totalPages = Math.ceil(allEntries.length / CARDS_PER_PAGE);
     const paginatedEntries = allEntries.slice(
@@ -134,7 +118,6 @@ export default function PhoneCredential() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // Reset to page 1 when search changes
     const handleSearch = (e) => {
         setSearchQuery(e.target.value);
         setPage(1);
@@ -153,48 +136,90 @@ export default function PhoneCredential() {
         }
     };
 
+    const getTypeColor = (type, hasType) => {
+        if (!hasType) return GREY_COLOR;
+        switch (type) {
+            case 'A':
+                return GREEN_COLOR;
+            case 'B':
+                return BLUE_COLOR;
+            case 'C':
+                return WARNING_COLOR;
+            default:
+                return BLUE_COLOR;
+        }
+    };
+
+    const getTypeBackground = (type, hasType) => {
+        if (!hasType) return alpha(GREY_COLOR, 0.1);
+        switch (type) {
+            case 'A':
+                return alpha(GREEN_COLOR, 0.1);
+            case 'B':
+                return alpha(BLUE_COLOR, 0.1);
+            case 'C':
+                return alpha(WARNING_COLOR, 0.1);
+            default:
+                return alpha(BLUE_COLOR, 0.1);
+        }
+    };
+
+    const getTypeBorder = (type, hasType) => {
+        if (!hasType) return alpha(GREY_COLOR, 0.2);
+        switch (type) {
+            case 'A':
+                return alpha(GREEN_COLOR, 0.3);
+            case 'B':
+                return alpha(BLUE_COLOR, 0.3);
+            case 'C':
+                return alpha(WARNING_COLOR, 0.3);
+            default:
+                return alpha(BLUE_COLOR, 0.3);
+        }
+    };
+
     if (isLoading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-                <Typography>Loading credentials...</Typography>
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                <CircularProgress />
             </Box>
         );
     }
 
     if (queryError) {
         return (
-            <Alert severity="error">
-                Error loading credentials: {queryError?.message || 'Unknown error'}
-            </Alert>
+            <Box p={3} textAlign="center">
+                <Alert severity="error">
+                    Error loading credentials: {queryError?.message || 'Unknown error'}
+                </Alert>
+            </Box>
         );
     }
 
     const hasData = paginatedEntries.length > 0;
 
     return (
-        <Box sx={{ p: 0.5 }}>
+        <Box>
             <Helmet>
-                <title> Phone Credentials | Power Automate</title>
-                <meta name="description" content="SuperAdmin dashboard" />
+                <title>Valid Phone & Password | Power Automate</title>
             </Helmet>
-            {/* Header */}
-            <Box mb={1}>
+
+            <Box sx={{ mb: 3 }}>
                 <Typography sx={{
                     fontWeight: 600,
                     mb: 0.5,
-                    fontSize: '1.1rem',
-                    background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
+                    fontSize: { xs: '1rem', sm: '1.1rem' },
+                    background: `linear-gradient(135deg, ${WARNING_DARK} 0%, ${WARNING_COLOR} 100%)`,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
                 }}>
-                    Phone Credentials
+                    Valid Phone & Password
                 </Typography>
                 <Typography variant="caption" sx={{ fontSize: '0.75rem', color: TEXT_PRIMARY }}>
                     Manage and download phone credentials grouped by PA ID
                 </Typography>
             </Box>
-            {/* Search */}
+
             <Box mb={3}>
                 <StyledTextField
                     placeholder="Search by PA ID, phone, or type..."
@@ -204,20 +229,16 @@ export default function PhoneCredential() {
                     fullWidth
                     sx={{
                         maxWidth: 400,
-                        '& .MuiInputBase-input': {
-                            fontSize: '0.8rem',
-                            color: TEXT_PRIMARY,
-                        },
+                        '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY },
                     }}
                 />
             </Box>
 
-            {/* Cards Grid */}
             {!hasData ? (
-                <Alert severity="info">
+                <Alert severity="info" sx={{ fontSize: '0.85rem' }}>
                     {searchQuery
-                        ? 'No credentials found matching your search.'
-                        : 'No credentials available.'}
+                        ? 'No credentials found matching your search'
+                        : 'No credentials available'}
                 </Alert>
             ) : (
                 <>
@@ -228,35 +249,37 @@ export default function PhoneCredential() {
                                     elevation={2}
                                     sx={{
                                         height: '100%',
-                                        borderRadius: 3,
-                                        border: `1px solid ${alpha(BLUE_COLOR, 0.15)}`,
-                                        transition: 'box-shadow 0.2s',
+                                        borderRadius: 2,
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        transition: 'transform 0.2s, box-shadow 0.2s',
                                         '&:hover': {
-                                            boxShadow: `0 4px 10px ${alpha(BLUE_COLOR, 0.15)}`,
+                                            boxShadow: `0 4px 10px ${alpha(WARNING_COLOR, 0.15)}`,
                                         },
                                     }}
                                 >
                                     <CardHeader
                                         title={
-                                            <Typography variant="subtitle1" fontWeight={600} noWrap>
-                                                ID: {paId}
+                                            <Typography variant="body1" fontWeight={600} sx={{ fontSize: '0.95rem' }}>
+                                                PA ID: {paId}
                                             </Typography>
                                         }
                                         subheader={
-                                            <Typography variant="body2" color="text.secondary">
-                                                {paCredentials.length} credential
-                                                {paCredentials.length !== 1 ? 's' : ''}
+                                            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.7) }}>
+                                                {paCredentials.length} credential{paCredentials.length !== 1 ? 's' : ''}
                                             </Typography>
                                         }
-                                        sx={{ pb: 1 }}
+                                        sx={{ pb: 0.5, px: 2, pt: 1.5 }}
                                     />
 
-                                    <CardContent sx={{ pt: 0 }}>
+                                    <CardContent sx={{ pt: 0, px: 2, pb: 1.5 }}>
                                         {uniqueTypes.map((type, index) => {
                                             const typeCredentials = paCredentials.filter(
                                                 (cred) => cred.type === type
                                             );
                                             const hasType = typeCredentials.length > 0;
+                                            const typeColor = getTypeColor(type, hasType);
+                                            const typeBg = getTypeBackground(type, hasType);
+                                            const typeBorder = getTypeBorder(type, hasType);
 
                                             return (
                                                 <Box key={type}>
@@ -264,28 +287,27 @@ export default function PhoneCredential() {
                                                         display="flex"
                                                         alignItems="center"
                                                         justifyContent="space-between"
-                                                        py={1}
+                                                        py={0.75}
                                                     >
                                                         <Box display="flex" alignItems="center" gap={1}>
                                                             <Chip
-                                                                label={`Type: ${type}`}
+                                                                label={`Type ${type}`}
                                                                 size="small"
                                                                 sx={{
-                                                                    fontSize: '0.75rem',
-                                                                    height: 24,
-                                                                    backgroundColor: hasType
-                                                                        ? alpha(GREEN_COLOR, 0.1)
-                                                                        : alpha(GREY_COLOR, 0.1),
-                                                                    color: hasType ? GREEN_COLOR : GREY_COLOR,
-                                                                    border: `1px solid ${hasType
-                                                                        ? alpha(GREEN_COLOR, 0.3)
-                                                                        : alpha(GREY_COLOR, 0.2)
-                                                                        }`,
+                                                                    fontSize: '0.7rem',
+                                                                    height: 22,
+                                                                    backgroundColor: typeBg,
+                                                                    color: typeColor,
+                                                                    border: `1px solid ${typeBorder}`,
+                                                                    fontWeight: 500,
                                                                 }}
                                                             />
                                                             <Typography
-                                                                variant="body2"
-                                                                color={hasType ? 'text.secondary' : GREY_COLOR}
+                                                                variant="caption"
+                                                                sx={{ 
+                                                                    fontSize: '0.75rem',
+                                                                    color: hasType ? TEXT_PRIMARY : alpha(TEXT_PRIMARY, 0.5)
+                                                                }}
                                                             >
                                                                 {hasType
                                                                     ? `${typeCredentials.length} credential${typeCredentials.length !== 1 ? 's' : ''}`
@@ -294,25 +316,22 @@ export default function PhoneCredential() {
                                                         </Box>
 
                                                         {hasType && (
-                                                            <Box display="flex" gap={0.5}>
-                                                                <Tooltip title={`Download Type ${type}`}>
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        onClick={() =>
-                                                                            handleDownload(paCredentials, type)
-                                                                        }
-                                                                        sx={{
-                                                                            color: GREEN_COLOR,
-                                                                            p: 0.75,
-                                                                            '&:hover': {
-                                                                                backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                                                            },
-                                                                        }}
-                                                                    >
-                                                                        <DownloadIcon sx={{ fontSize: 18 }} />
-                                                                    </IconButton>
-                                                                </Tooltip>
-                                                            </Box>
+                                                            <Tooltip title={`Download Type ${type}`}>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={() => handleDownload(paCredentials, type)}
+                                                                    sx={{
+                                                                        color: typeColor,
+                                                                        p: 0.5,
+                                                                        fontSize: '0.85rem',
+                                                                        '&:hover': {
+                                                                            backgroundColor: alpha(typeColor, 0.1),
+                                                                        },
+                                                                    }}
+                                                                >
+                                                                    <DownloadIcon sx={{ fontSize: 18 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
                                                         )}
                                                     </Box>
 
@@ -328,7 +347,6 @@ export default function PhoneCredential() {
                         ))}
                     </Grid>
 
-                    {/* Pagination */}
                     {totalPages > 1 && (
                         <Box display="flex" justifyContent="center" mt={4}>
                             <Pagination
@@ -339,41 +357,72 @@ export default function PhoneCredential() {
                                 shape="rounded"
                                 showFirstButton
                                 showLastButton
+                                sx={{
+                                    '& .MuiPaginationItem-root': {
+                                        fontSize: '0.85rem',
+                                    },
+                                }}
                             />
                         </Box>
                     )}
 
-                    <Box mt={1} display="flex" justifyContent="center">
-                        <Typography variant="caption" color="text.secondary">
+                    <Box mt={2} display="flex" justifyContent="center">
+                        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.7) }}>
                             Showing {(page - 1) * CARDS_PER_PAGE + 1}–
                             {Math.min(page * CARDS_PER_PAGE, allEntries.length)} of{' '}
-                            {allEntries.length} PA IDs
+                            {allEntries.length} PA ID{allEntries.length !== 1 ? 's' : ''}
                         </Typography>
                     </Box>
                 </>
             )}
 
-            {/* Success Snackbar */}
             <Snackbar
                 open={!!success}
                 autoHideDuration={3000}
                 onClose={() => setSuccess('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert severity="success" onClose={() => setSuccess('')}>
-                    {success}
+                <Alert 
+                    severity="success" 
+                    sx={{
+                        width: '100%',
+                        borderRadius: 1,
+                        backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                        borderLeft: `3px solid ${GREEN_COLOR}`,
+                        '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '1rem' },
+                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
+                        color: TEXT_PRIMARY,
+                        py: 0.5,
+                        px: 2,
+                    }}
+                    elevation={4}
+                >
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
-            {/* Error Snackbar */}
             <Snackbar
                 open={!!error}
                 autoHideDuration={3000}
                 onClose={() => setError('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert severity="error" onClose={() => setError('')}>
-                    {error}
+                <Alert 
+                    severity="error" 
+                    sx={{
+                        width: '100%',
+                        borderRadius: 1,
+                        backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                        borderLeft: `3px solid ${RED_COLOR}`,
+                        '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '1rem' },
+                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
+                        color: TEXT_PRIMARY,
+                        py: 0.5,
+                        px: 2,
+                    }}
+                    elevation={4}
+                >
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{error}</Typography>
                 </Alert>
             </Snackbar>
         </Box>

@@ -22,9 +22,9 @@ import { ClientDashboard } from '../pages/client/ClientDashboard';
 import { ClientProfile } from '../pages/client/Profile';
 import ForgotPassword from '../pages/forgot-password/ForgotPassword';
 import ResetPassword from '../pages/reset-password/ResetPassword';
-import Forms from '../pages/superadmin/Forms';
+import PhoneNumbers from '../pages/superadmin/PhoneNumbers';
 import PasswordFormatters from '../pages/superadmin/PasswordFormatters';
-import PhoneCredential from '../pages/superadmin/PhoneCredential';
+import ValidPhoneNumber from '../pages/superadmin/ValidPhoneNumber';
 
 
 
@@ -70,9 +70,9 @@ export const AppRoutes = () => {
         >
           <Route index element={<SuperAdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
-          <Route path="forms" element={<Forms />} />
+          <Route path="phone-numbers" element={<PhoneNumbers />} />
           <Route path="password-formatters" element={<PasswordFormatters />} />
-          <Route path="phone-credential" element={<PhoneCredential />} />
+          <Route path="valid-phone-password" element={<ValidPhoneNumber />} />
           <Route path="profile" element={<SuperAdminProfile />} />
         </Route>
 

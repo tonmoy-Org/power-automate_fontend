@@ -5,11 +5,12 @@ import {
     AccountCircle as AccountIcon,
     Description as FormIcon,
     LockOutlined as PasswordFormatterIcon,
+    PhoneIphone as PhoneIcon,
+    VpnKey as VpnKeyIcon,
 } from '@mui/icons-material';
 
 export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
     const menuItems = [
-        // Main Section
         {
             sectionName: 'Main',
             items: [
@@ -25,30 +26,26 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                 },
             ]
         },
-
-        // System & Configuration Section
         {
             sectionName: 'System & Configuration',
             items: [
                 {
-                    text: 'Forms',
-                    icon: <FormIcon />,
-                    path: '/superadmin-dashboard/forms'
+                    text: 'Phone Numbers',
+                    icon: <PhoneIcon />,
+                    path: '/superadmin-dashboard/phone-numbers'
                 },
                 {
                     text: 'Password Formatters',
-                    icon: <PasswordFormatterIcon />,   // ← distinct icon
+                    icon: <PasswordFormatterIcon />,
                     path: '/superadmin-dashboard/password-formatters'
                 },
                 {
-                    text: 'Phone Credential ',
-                    icon: <PasswordFormatterIcon />,   // ← distinct icon
-                    path: '/superadmin-dashboard/phone-credential'
+                    text: 'Valid Phone & Password',
+                    icon: <VpnKeyIcon />,
+                    path: '/superadmin-dashboard/valid-phone-password'
                 },
             ]
         },
-
-        // Profile Section
         {
             sectionName: 'Profile',
             items: [
@@ -61,18 +58,11 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
         },
     ];
 
-    // Process menu items to add click handlers
-    const processedMenuItems = menuItems.map(section => {
-        const processedItems = section.items.map(item => ({
+    return menuItems.map(section => ({
+        ...section,
+        items: section.items.map(item => ({
             ...item,
             onClick: () => onMenuItemClick(item.path)
-        }));
-
-        return {
-            ...section,
-            items: processedItems
-        };
-    });
-
-    return processedMenuItems;
+        }))
+    }));
 };

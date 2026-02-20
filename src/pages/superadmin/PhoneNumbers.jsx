@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -51,7 +51,6 @@ import axiosInstance from '../../api/axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 
-// API functions
 const fetchPhoneNumbers = async ({ queryKey }) => {
     const [, page, limit, search] = queryKey;
     const params = new URLSearchParams({
@@ -83,11 +82,10 @@ const deletePhoneNumber = async (id) => {
     return response.data;
 };
 
-// Initial form data
 const initialFormData = {
     country_code: '',
     number: '',
-    browser_reset_time: 10,
+    browser_reset_time: '',
     password_formatter_ids: []
 };
 
@@ -105,36 +103,25 @@ export const PhoneNumbers = () => {
     const theme = useTheme();
     const queryClient = useQueryClient();
 
-    // Theme colors
     const BLUE_COLOR = theme.palette.primary.main;
-    const BLUE_DARK = theme.palette.primary.dark || theme.palette.primary.main;
+    const BLUE_DARK = theme.palette.primary.dark;
     const RED_COLOR = theme.palette.error.main;
-    const RED_DARK = theme.palette.error.dark || theme.palette.error.main;
+    const RED_DARK = theme.palette.error.dark;
     const GREEN_COLOR = theme.palette.success.main;
     const TEXT_PRIMARY = theme.palette.text.primary;
 
-    // State for dialogs
     const [openDialog, setOpenDialog] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-
-    // Selected items
     const [selectedNumber, setSelectedNumber] = useState(null);
     const [itemToDelete, setItemToDelete] = useState(null);
-
-    // Notifications
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
-
-    // Search and pagination
     const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [debouncedSearch, setDebouncedSearch] = useState('');
-
-    // Form data
     const [formData, setFormData] = useState(initialFormData);
 
-    // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(searchQuery);
@@ -143,7 +130,6 @@ export const PhoneNumbers = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Fetch phone numbers with React Query
     const {
         data: phoneNumbersData,
         isLoading,
@@ -156,7 +142,6 @@ export const PhoneNumbers = () => {
         keepPreviousData: true,
     });
 
-    // Fetch password formatters for dropdown
     const {
         data: formattersData,
         isLoading: formattersLoading
@@ -165,12 +150,11 @@ export const PhoneNumbers = () => {
         queryFn: fetchPasswordFormatters,
     });
 
-    // Create mutation
     const createMutation = useMutation({
         mutationFn: createPhoneNumber,
         onSuccess: (data) => {
             queryClient.invalidateQueries(['phoneNumbers']);
-            setSuccess(data.message || 'Phone number created successfully!');
+            setSuccess(data.message || 'Phone number created successfully');
             setOpenDialog(false);
             resetForm();
         },
@@ -179,12 +163,11 @@ export const PhoneNumbers = () => {
         }
     });
 
-    // Update mutation
     const updateMutation = useMutation({
         mutationFn: updatePhoneNumber,
         onSuccess: (data) => {
             queryClient.invalidateQueries(['phoneNumbers']);
-            setSuccess(data.message || 'Phone number updated successfully!');
+            setSuccess(data.message || 'Phone number updated successfully');
             setOpenDialog(false);
             resetForm();
         },
@@ -193,15 +176,13 @@ export const PhoneNumbers = () => {
         }
     });
 
-    // Delete mutation
     const deleteMutation = useMutation({
         mutationFn: deletePhoneNumber,
         onSuccess: (data) => {
             queryClient.invalidateQueries(['phoneNumbers']);
-            setSuccess(data.message || 'Phone number deleted successfully!');
+            setSuccess(data.message || 'Phone number deleted successfully');
             setOpenDeleteDialog(false);
             setItemToDelete(null);
-
             if (phoneNumbersData?.data?.length === 1 && page > 0) {
                 setPage(page - 1);
             }
@@ -211,60 +192,40 @@ export const PhoneNumbers = () => {
         }
     });
 
-    // Get data from query response
     const phoneNumbers = phoneNumbersData?.data || [];
     const totalCount = phoneNumbersData?.pagination?.total || 0;
     const passwordFormatters = formattersData?.data || [];
 
-    // ─── FIX: Match embedded formatters to master list by content, not _id ──────
     const getSelectedFormatterIds = (phoneNumber) => {
         if (!phoneNumber?.password_formatters || !Array.isArray(phoneNumber.password_formatters)) {
             return [];
         }
-
         return phoneNumber.password_formatters
             .map((embeddedFormatter) => {
                 const master = matchFormatterToMaster(embeddedFormatter, passwordFormatters);
-                if (master) {
-                    return String(master._id);
-                }
-                // Fallback: log unmatched so you can debug data mismatches
-                console.warn('Could not match embedded formatter to master list:', embeddedFormatter);
-                return null;
+                return master ? String(master._id) : null;
             })
             .filter(Boolean);
     };
-    // ─────────────────────────────────────────────────────────────────────────────
 
-    // Handlers for pagination
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
+    const handleChangePage = (event, newPage) => setPage(newPage);
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
     };
 
-    // Reset form
     const resetForm = () => {
         setFormData(initialFormData);
         setSelectedNumber(null);
     };
 
-    // Handle input changes
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Handle formatter selection with Select All functionality
     const handleFormatterSelectChange = (event) => {
         const { value } = event.target;
-
         if (value.includes('select-all')) {
             if (formData.password_formatter_ids.length === passwordFormatters.length) {
                 setFormData(prev => ({ ...prev, password_formatter_ids: [] }));
@@ -278,37 +239,26 @@ export const PhoneNumbers = () => {
             const selectedValues = Array.isArray(value)
                 ? value.map(v => String(v))
                 : value.split(',').map(v => String(v));
-            setFormData(prev => ({
-                ...prev,
-                password_formatter_ids: selectedValues
-            }));
+            setFormData(prev => ({ ...prev, password_formatter_ids: selectedValues }));
         }
     };
 
-    // Copy PA ID to clipboard
     const handleCopyPaId = (paId) => {
         navigator.clipboard.writeText(paId);
-        setSuccess(`PA ID ${paId} copied to clipboard!`);
-        setTimeout(() => setSuccess(''), 2000);
+        setSuccess(`PA ID ${paId} copied to clipboard`);
     };
 
-    // CRUD operations
     const handleOpenDialog = (number = null) => {
         if (number) {
             setSelectedNumber(number);
-
-            // Wait until formatters are loaded before computing selected IDs
-            // If formatters aren't loaded yet, we'll set them after load (see useEffect below)
             const selectedIds = passwordFormatters.length > 0
                 ? getSelectedFormatterIds(number)
                 : [];
-
             setFormData({
-                country_code: number.country_code,
-                number: number.number,
-                browser_reset_time: number.browser_reset_time,
+                country_code: number.country_code || '',
+                number: number.number || '',
+                browser_reset_time: number.browser_reset_time || '',
                 password_formatter_ids: selectedIds,
-                // Temporarily store raw embedded formatters so we can recompute after load
                 _pendingFormatters: passwordFormatters.length === 0 ? number.password_formatters : null,
             });
         } else {
@@ -317,7 +267,6 @@ export const PhoneNumbers = () => {
         setOpenDialog(true);
     };
 
-    // Once formatters load, resolve any pending formatter IDs
     useEffect(() => {
         if (
             passwordFormatters.length > 0 &&
@@ -330,7 +279,6 @@ export const PhoneNumbers = () => {
                     return master ? String(master._id) : null;
                 })
                 .filter(Boolean);
-
             setFormData(prev => ({
                 ...prev,
                 password_formatter_ids: resolvedIds,
@@ -353,7 +301,7 @@ export const PhoneNumbers = () => {
         const apiData = {
             country_code: formData.country_code,
             number: formData.number,
-            browser_reset_time: formData.browser_reset_time,
+            browser_reset_time: formData.browser_reset_time === '' ? undefined : Number(formData.browser_reset_time),
             password_formatters: selectedFormatters
         };
 
@@ -375,39 +323,18 @@ export const PhoneNumbers = () => {
         }
     };
 
-    // Helper functions
-    const getStatusStyle = (isActive) => {
-        if (isActive) {
-            return {
-                backgroundColor: theme.palette.mode === 'dark'
-                    ? alpha(GREEN_COLOR, 0.2)
-                    : alpha(GREEN_COLOR, 0.1),
-                color: GREEN_COLOR,
-                borderColor: GREEN_COLOR,
-            };
-        } else {
-            return {
-                backgroundColor: theme.palette.mode === 'dark'
-                    ? alpha(RED_COLOR, 0.2)
-                    : alpha(RED_COLOR, 0.1),
-                color: RED_COLOR,
-                borderColor: RED_COLOR,
-            };
-        }
-    };
+    const getStatusStyle = (isActive) => ({
+        backgroundColor: alpha(isActive ? GREEN_COLOR : RED_COLOR, 0.1),
+        color: isActive ? GREEN_COLOR : RED_COLOR,
+        borderColor: isActive ? GREEN_COLOR : RED_COLOR,
+    });
 
-    const getStatusLabel = (isActive) => (isActive ? 'Active' : 'Inactive');
+    const getStatusLabel = (isActive) => isActive ? 'Active' : 'Inactive';
 
     const MenuProps = {
-        PaperProps: {
-            style: {
-                maxHeight: 48 * 4.5 + 8,
-                width: 250,
-            },
-        },
+        PaperProps: { style: { maxHeight: 48 * 4.5 + 8, width: 250 } }
     };
 
-    // Show error from query if any
     if (isError) {
         return (
             <Box p={3} textAlign="center">
@@ -424,25 +351,23 @@ export const PhoneNumbers = () => {
     return (
         <Box>
             <Helmet>
-                <title> Phone Credentials | Power Automate</title>
-                <meta name="description" content="SuperAdmin dashboard" />
+                <title>Phone Numbers | Power Automate</title>
             </Helmet>
-            {/* Header */}
-            <Box sx={{ display: { xs: 'block', lg: 'flex' } }} justifyContent="space-between" alignItems="center" mb={2}>
-                <Box mb={1}>
+
+            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2} mb={3}>
+                <Box>
                     <Typography sx={{
                         fontWeight: 600,
                         mb: 0.5,
-                        fontSize: '1.1rem',
+                        fontSize: { xs: '1rem', sm: '1.1rem' },
                         background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
                     }}>
-                        Phone Numbers Management
+                        Phone Numbers
                     </Typography>
                     <Typography variant="caption" sx={{ fontSize: '0.75rem', color: TEXT_PRIMARY }}>
-                        Manage phone numbers, browser reset times, and password formatters
+                        Manage phone numbers and password formatters
                     </Typography>
                 </Box>
                 <GradientButton
@@ -450,15 +375,14 @@ export const PhoneNumbers = () => {
                     startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />}
                     onClick={() => handleOpenDialog()}
                     size="small"
-                    sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
+                    sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }}
                     disabled={createMutation.isLoading}
                 >
                     Add Phone Number
                 </GradientButton>
             </Box>
 
-            {/* Search Bar */}
-            <Box mb={2}>
+            <Box mb={3}>
                 <StyledTextField
                     fullWidth
                     placeholder="Search by PA ID, phone number, or country code..."
@@ -468,16 +392,10 @@ export const PhoneNumbers = () => {
                         startAdornment: <SearchIcon sx={{ mr: 1, color: TEXT_PRIMARY, fontSize: '0.9rem', opacity: 0.7 }} />,
                     }}
                     size="small"
-                    sx={{
-                        '& .MuiInputBase-input': {
-                            fontSize: '0.8rem',
-                            color: TEXT_PRIMARY,
-                        },
-                    }}
+                    sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY } }}
                 />
             </Box>
 
-            {/* Phone Numbers Table */}
             <TableContainer
                 component={Paper}
                 elevation={0}
@@ -485,7 +403,7 @@ export const PhoneNumbers = () => {
                     borderRadius: 1.5,
                     border: `1px solid ${theme.palette.divider}`,
                     backgroundColor: theme.palette.background.paper,
-                    overflow: 'hidden',
+                    overflow: 'auto',
                     mb: 3,
                     position: 'relative',
                     minHeight: 400,
@@ -508,45 +426,30 @@ export const PhoneNumbers = () => {
                     </Box>
                 )}
 
-                <Table size="small">
+                <Table size="medium">
                     <TableHead>
                         <TableRow sx={{
-                            backgroundColor: theme.palette.mode === 'dark'
-                                ? alpha(BLUE_COLOR, 0.1)
-                                : alpha(BLUE_COLOR, 0.05),
+                            backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05)
                         }}>
-                            {['PA ID', 'Country Code', 'Phone Number', 'Browser Reset', 'Password Formatters', 'Status'].map((header) => (
-                                <TableCell key={header} sx={{
-                                    fontWeight: 600,
-                                    color: TEXT_PRIMARY,
-                                    borderBottom: `2px solid ${BLUE_COLOR}`,
-                                    fontSize: '0.8rem',
-                                    py: 1,
-                                }}>
-                                    {header}
-                                </TableCell>
-                            ))}
-                            <TableCell align="right" sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${BLUE_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>
-                                Actions
-                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>PA ID</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Country Code</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Phone Number</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Browser Reset</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Password Formatters</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Status</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {!isLoading && phoneNumbers.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                                    <Box py={2}>
-                                        <PhoneIcon sx={{ fontSize: 32, color: alpha(TEXT_PRIMARY, 0.2), mb: 1.5 }} />
-                                        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: TEXT_PRIMARY }}>
+                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                                    <Box py={3}>
+                                        <PhoneIcon sx={{ fontSize: 48, color: alpha(TEXT_PRIMARY, 0.2), mb: 2 }} />
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
                                             {debouncedSearch
-                                                ? 'No phone numbers found matching your search.'
-                                                : 'No phone numbers found. Add one to get started.'}
+                                                ? 'No phone numbers found matching your search'
+                                                : 'No phone numbers found. Add one to get started'}
                                         </Typography>
                                     </Box>
                                 </TableCell>
@@ -557,114 +460,92 @@ export const PhoneNumbers = () => {
                                     key={item._id}
                                     hover
                                     sx={{
-                                        '&:hover': {
-                                            backgroundColor: theme.palette.mode === 'dark'
-                                                ? alpha(BLUE_COLOR, 0.05)
-                                                : alpha(BLUE_COLOR, 0.03),
-                                        },
+                                        '&:hover': { backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.05 : 0.03) },
                                         '&:last-child td': { borderBottom: 0 },
                                         opacity: deleteMutation.isLoading && itemToDelete?._id === item._id ? 0.5 : 1,
                                     }}
                                 >
-                                    <TableCell sx={{ py: 1 }}>
+                                    <TableCell sx={{ py: 1.5 }}>
                                         <Box display="flex" alignItems="center" gap={0.5}>
-                                            <Typography variant="caption" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace', fontWeight: 500 }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace', fontWeight: 500 }}>
                                                 {item.pa_id}
                                             </Typography>
                                             <Tooltip title="Copy PA ID">
                                                 <IconButton
                                                     size="small"
                                                     onClick={() => handleCopyPaId(item.pa_id)}
-                                                    sx={{
-                                                        color: BLUE_COLOR,
-                                                        fontSize: '0.7rem',
-                                                        p: 0.5,
-                                                        '&:hover': { backgroundColor: alpha(BLUE_COLOR, 0.1) },
-                                                    }}
+                                                    sx={{ color: BLUE_COLOR, fontSize: '0.8rem', p: 0.5 }}
                                                 >
                                                     <CopyIcon fontSize="inherit" />
                                                 </IconButton>
                                             </Tooltip>
                                         </Box>
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
+                                    <TableCell sx={{ py: 1.5 }}>
                                         <Chip
                                             label={item.country_code}
                                             size="small"
-                                            sx={{
-                                                backgroundColor: alpha(BLUE_COLOR, 0.1),
-                                                color: BLUE_COLOR,
-                                                fontWeight: 500,
-                                                fontSize: '0.7rem',
-                                                height: 20,
-                                            }}
+                                            sx={{ backgroundColor: alpha(BLUE_COLOR, 0.1), color: BLUE_COLOR, fontWeight: 500, fontSize: '0.75rem', height: 24 }}
                                         />
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Typography variant="caption" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
                                             {item.number}
                                         </Typography>
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Typography variant="caption" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
                                             {item.browser_reset_time}
                                         </Typography>
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
+                                    <TableCell sx={{ py: 1.5 }}>
                                         <Box display="flex" gap={0.5} flexWrap="wrap">
                                             {item.password_formatters?.map((formatter) => (
                                                 <Tooltip
                                                     key={formatter._id}
-                                                    title={`${formatter.start_add} (${formatter.start_index}–${formatter.end_index}) → ${formatter.end_add}`}
+                                                    title={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
                                                 >
                                                     <Chip
-                                                        label={formatter.start_add}
+                                                        label={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
                                                         size="small"
                                                         sx={{
                                                             backgroundColor: alpha(GREEN_COLOR, 0.1),
                                                             color: GREEN_COLOR,
-                                                            fontSize: '0.65rem',
-                                                            height: 18,
-                                                            '& .MuiChip-label': { px: 0.8 }
+                                                            fontSize: '0.7rem',
+                                                            height: 24,
+                                                            '& .MuiChip-label': { px: 1 }
                                                         }}
                                                     />
                                                 </Tooltip>
                                             ))}
                                             {(!item.password_formatters || item.password_formatters.length === 0) && (
-                                                <Typography variant="caption" sx={{ fontSize: '0.7rem', color: alpha(TEXT_PRIMARY, 0.5), fontStyle: 'italic' }}>
+                                                <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.5), fontStyle: 'italic' }}>
                                                     No formatters
                                                 </Typography>
                                             )}
                                         </Box>
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
+                                    <TableCell sx={{ py: 1.5 }}>
                                         <Chip
                                             label={getStatusLabel(item.is_active)}
                                             size="small"
                                             variant="outlined"
-                                            icon={item.is_active
-                                                ? <CheckCircleIcon sx={{ fontSize: '0.7rem' }} />
-                                                : <BlockIcon sx={{ fontSize: '0.7rem' }} />
-                                            }
+                                            icon={item.is_active ? <CheckCircleIcon sx={{ fontSize: '0.75rem' }} /> : <BlockIcon sx={{ fontSize: '0.75rem' }} />}
                                             sx={{
                                                 fontWeight: 500,
-                                                fontSize: '0.7rem',
-                                                height: 20,
+                                                fontSize: '0.75rem',
+                                                height: 24,
                                                 ...getStatusStyle(item.is_active),
                                                 '& .MuiChip-label': { px: 1 },
                                             }}
                                         />
                                     </TableCell>
-                                    <TableCell align="right" sx={{ py: 1 }}>
+                                    <TableCell align="right" sx={{ py: 1.5 }}>
                                         <Tooltip title="Edit">
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleOpenDialog(item)}
-                                                sx={{
-                                                    color: BLUE_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': { backgroundColor: alpha(BLUE_COLOR, 0.1) },
-                                                }}
+                                                sx={{ color: BLUE_COLOR, fontSize: '0.9rem', mr: 0.5 }}
                                                 disabled={updateMutation.isLoading || deleteMutation.isLoading}
                                             >
                                                 <EditIcon fontSize="inherit" />
@@ -674,11 +555,7 @@ export const PhoneNumbers = () => {
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleDeleteClick(item)}
-                                                sx={{
-                                                    color: RED_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': { backgroundColor: alpha(RED_COLOR, 0.1) },
-                                                }}
+                                                sx={{ color: RED_COLOR, fontSize: '0.9rem' }}
                                                 disabled={updateMutation.isLoading || deleteMutation.isLoading}
                                             >
                                                 <DeleteIcon fontSize="inherit" />
@@ -691,7 +568,6 @@ export const PhoneNumbers = () => {
                     </TableBody>
                 </Table>
 
-                {/* Pagination */}
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
@@ -702,41 +578,31 @@ export const PhoneNumbers = () => {
                     onRowsPerPageChange={handleChangeRowsPerPage}
                     sx={{
                         borderTop: `1px solid ${theme.palette.divider}`,
-                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                            fontSize: '0.75rem',
-                            color: TEXT_PRIMARY,
-                        },
+                        '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': { fontSize: '0.8rem', color: TEXT_PRIMARY }
                     }}
-                    size="small"
                 />
             </TableContainer>
 
-            {/* Add/Edit Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={() => { setOpenDialog(false); resetForm(); }}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
                 <DialogTitle sx={{
                     color: TEXT_PRIMARY,
                     fontWeight: 600,
-                    fontSize: '0.95rem',
-                    py: 1.5,
-                    px: 2,
+                    fontSize: '1rem',
+                    py: 2,
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
                     {selectedNumber ? 'Edit Phone Number' : 'Add New Phone Number'}
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={12} sm={6}>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <Grid container spacing={2.5} sx={{ mt: 2 }}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <StyledTextField
                                 fullWidth
                                 label="Country Code"
@@ -744,12 +610,10 @@ export const PhoneNumbers = () => {
                                 value={formData.country_code}
                                 onChange={handleInputChange}
                                 placeholder="+1"
-                                required
                                 size="small"
-                                sx={{ '& .MuiInputBase-input': { fontSize: '0.8rem', color: TEXT_PRIMARY } }}
                             />
                         </Grid>
-                        <Grid item xs={12} sm={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <StyledTextField
                                 fullWidth
                                 label="Phone Number"
@@ -757,34 +621,23 @@ export const PhoneNumbers = () => {
                                 value={formData.number}
                                 onChange={handleInputChange}
                                 placeholder="1234567890"
-                                required
                                 size="small"
-                                sx={{ '& .MuiInputBase-input': { fontSize: '0.8rem', color: TEXT_PRIMARY } }}
                             />
                         </Grid>
-                        <Grid item xs={12}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <StyledTextField
                                 fullWidth
-                                label="Browser Reset Time (minutes)"
+                                label="Browser Reset Time"
                                 name="browser_reset_time"
-                                type="number"
                                 value={formData.browser_reset_time}
                                 onChange={handleInputChange}
-                                required
+                                placeholder="Enter minutes"
                                 size="small"
-                                InputProps={{ inputProps: { min: 1 } }}
-                                sx={{ '& .MuiInputBase-input': { fontSize: '0.8rem', color: TEXT_PRIMARY } }}
                             />
                         </Grid>
-                        <Grid item xs={12}>
-                            <FormControl fullWidth size="small">
-                                <InputLabel
-                                    sx={{
-                                        fontSize: '0.8rem',
-                                        color: TEXT_PRIMARY,
-                                        '&.Mui-focused': { color: GREEN_COLOR },
-                                    }}
-                                >
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <FormControl fullWidth size='small'>
+                                <InputLabel>
                                     Password Formatters
                                 </InputLabel>
                                 <Select
@@ -799,13 +652,13 @@ export const PhoneNumbers = () => {
                                                 return formatter ? (
                                                     <Chip
                                                         key={value}
-                                                        label={`${formatter.start_add} → ${formatter.end_add}`}
+                                                        label={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
                                                         size="small"
                                                         sx={{
                                                             backgroundColor: alpha(GREEN_COLOR, 0.1),
                                                             color: GREEN_COLOR,
                                                             fontSize: '0.7rem',
-                                                            height: 20,
+                                                            height: 24,
                                                         }}
                                                     />
                                                 ) : (
@@ -817,7 +670,7 @@ export const PhoneNumbers = () => {
                                                             backgroundColor: alpha(RED_COLOR, 0.1),
                                                             color: RED_COLOR,
                                                             fontSize: '0.7rem',
-                                                            height: 20,
+                                                            height: 24,
                                                         }}
                                                     />
                                                 );
@@ -825,12 +678,10 @@ export const PhoneNumbers = () => {
                                         </Box>
                                     )}
                                     MenuProps={MenuProps}
-                                    sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}
                                     disabled={formattersLoading}
                                 >
-                                    {/* Select All option */}
                                     {!formattersLoading && passwordFormatters.length > 0 && (
-                                        <MenuItem value="select-all" sx={{ fontSize: '0.8rem' }}>
+                                        <MenuItem value="select-all" sx={{ fontSize: '0.85rem' }}>
                                             <Checkbox
                                                 checked={formData.password_formatter_ids.length === passwordFormatters.length}
                                                 indeterminate={
@@ -853,31 +704,26 @@ export const PhoneNumbers = () => {
                                             const formatterId = String(formatter._id);
                                             const isSelected = formData.password_formatter_ids.includes(formatterId);
                                             return (
-                                                <MenuItem key={formatterId} value={formatterId} sx={{ fontSize: '0.8rem' }}>
+                                                <MenuItem key={formatterId} value={formatterId} sx={{ fontSize: '0.85rem' }}>
                                                     <Checkbox checked={isSelected} size="small" />
                                                     <ListItemText
-                                                        primary={`${formatter.start_add} → ${formatter.end_add}`}
-                                                        secondary={`Index: ${formatter.start_index} – ${formatter.end_index}`}
-                                                        primaryTypographyProps={{ fontSize: '0.8rem' }}
-                                                        secondaryTypographyProps={{ fontSize: '0.7rem' }}
+                                                        primary={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
+                                                        primaryTypographyProps={{ fontSize: '0.85rem' }}
                                                     />
                                                 </MenuItem>
                                             );
                                         })
                                     )}
                                 </Select>
-                                <FormHelperText sx={{ fontSize: '0.7rem', color: alpha(TEXT_PRIMARY, 0.7) }}>
-                                    Select password formatters for this phone number
-                                </FormHelperText>
                             </FormControl>
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
                         onClick={() => { setOpenDialog(false); resetForm(); }}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                         disabled={createMutation.isLoading || updateMutation.isLoading}
                     >
                         Cancel
@@ -886,11 +732,11 @@ export const PhoneNumbers = () => {
                         onClick={handleSubmit}
                         variant="contained"
                         disabled={!formData.country_code || !formData.number || createMutation.isLoading || updateMutation.isLoading}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                     >
                         {createMutation.isLoading || updateMutation.isLoading ? (
-                            <CircularProgress size={16} sx={{ color: 'white' }} />
+                            <CircularProgress size={18} sx={{ color: 'white' }} />
                         ) : (
                             selectedNumber ? 'Update' : 'Create'
                         )}
@@ -898,47 +744,38 @@ export const PhoneNumbers = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={openDeleteDialog}
                 onClose={() => setOpenDeleteDialog(false)}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
                 <DialogTitle sx={{
-                    pb: 1,
                     color: RED_COLOR,
                     fontWeight: 600,
-                    fontSize: '0.9rem',
-                    py: 1.5,
-                    px: 2,
+                    fontSize: '1rem',
+                    py: 2,
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                        <DeleteIcon sx={{ fontSize: '0.9rem' }} />
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <DeleteIcon sx={{ fontSize: '1.1rem' }} />
                         Confirm Delete
                     </Box>
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Box py={0.5}>
-                        <DialogContentText sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                            Are you sure you want to delete phone number{' '}
-                            <strong>"{itemToDelete?.pa_id} - {itemToDelete?.country_code} {itemToDelete?.number}"</strong>?
-                            This action cannot be undone.
-                        </DialogContentText>
-                    </Box>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <DialogContentText sx={{ fontSize: '0.9rem', color: TEXT_PRIMARY }}>
+                        Are you sure you want to delete phone number{' '}
+                        <strong>"{itemToDelete?.pa_id} - {itemToDelete?.country_code} {itemToDelete?.number}"</strong>?
+                        This action cannot be undone.
+                    </DialogContentText>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
                         onClick={() => setOpenDeleteDialog(false)}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                         disabled={deleteMutation.isLoading}
                     >
                         Cancel
@@ -949,21 +786,15 @@ export const PhoneNumbers = () => {
                             background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
                             color: 'white',
                             borderRadius: 1,
-                            padding: '4px 16px',
+                            padding: '6px 16px',
                             fontWeight: 500,
-                            fontSize: '0.8rem',
+                            fontSize: '0.85rem',
                             textTransform: 'none',
-                            '&:hover': {
-                                background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)`,
-                            },
+                            '&:hover': { background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)` },
                         }}
                         onClick={handleDeleteConfirm}
-                        startIcon={
-                            deleteMutation.isLoading
-                                ? <CircularProgress size={16} sx={{ color: 'white' }} />
-                                : <DeleteIcon sx={{ fontSize: '0.8rem' }} />
-                        }
-                        size="small"
+                        startIcon={deleteMutation.isLoading ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <DeleteIcon sx={{ fontSize: '0.9rem' }} />}
+                        size="medium"
                         disabled={deleteMutation.isLoading}
                     >
                         {deleteMutation.isLoading ? 'Deleting...' : 'Delete'}
@@ -971,7 +802,6 @@ export const PhoneNumbers = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Success Snackbar */}
             <Snackbar
                 open={!!success}
                 autoHideDuration={3000}
@@ -983,23 +813,20 @@ export const PhoneNumbers = () => {
                     sx={{
                         width: '100%',
                         borderRadius: 1,
-                        backgroundColor: theme.palette.mode === 'dark'
-                            ? alpha(GREEN_COLOR, 0.1)
-                            : alpha(GREEN_COLOR, 0.05),
+                        backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
                         borderLeft: `3px solid ${GREEN_COLOR}`,
-                        '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '0.9rem' },
-                        '& .MuiAlert-message': { fontSize: '0.8rem', py: 0.5 },
+                        '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '1rem' },
+                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
                         color: TEXT_PRIMARY,
                         py: 0.5,
-                        px: 1.5,
+                        px: 2,
                     }}
                     elevation={4}
                 >
-                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{success}</Typography>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
-            {/* Error Snackbar */}
             <Snackbar
                 open={!!error}
                 autoHideDuration={3000}
@@ -1011,19 +838,17 @@ export const PhoneNumbers = () => {
                     sx={{
                         width: '100%',
                         borderRadius: 1,
-                        backgroundColor: theme.palette.mode === 'dark'
-                            ? alpha(RED_COLOR, 0.1)
-                            : alpha(RED_COLOR, 0.05),
+                        backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
                         borderLeft: `3px solid ${RED_COLOR}`,
-                        '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '0.9rem' },
-                        '& .MuiAlert-message': { fontSize: '0.8rem', py: 0.5 },
+                        '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '1rem' },
+                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
                         color: TEXT_PRIMARY,
                         py: 0.5,
-                        px: 1.5,
+                        px: 2,
                     }}
                     elevation={4}
                 >
-                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{error}</Typography>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{error}</Typography>
                 </Alert>
             </Snackbar>
         </Box>

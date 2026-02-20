@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Typography,
@@ -40,11 +40,10 @@ import axiosInstance from '../../api/axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 
-// API functions
 const fetchPasswordFormatters = async ({ queryKey }) => {
     const [, page, limit, search] = queryKey;
     const params = new URLSearchParams({
-        page: page + 1, // API uses 1-based pagination
+        page: page + 1,
         limit,
         search: search || ''
     });
@@ -67,11 +66,10 @@ const deletePasswordFormatter = async (id) => {
     return response.data;
 };
 
-// Initial form data
 const initialFormData = {
     start_add: '',
-    start_index: 0,
-    end_index: 100,
+    start_index: '',
+    end_index: '',
     end_add: ''
 };
 
@@ -79,46 +77,32 @@ export const PasswordFormatters = () => {
     const theme = useTheme();
     const queryClient = useQueryClient();
 
-    // Theme colors
     const GREEN_COLOR = theme.palette.success.main;
-    const GREEN_DARK = theme.palette.success.dark || theme.palette.success.main;
+    const GREEN_DARK = theme.palette.success.dark;
     const RED_COLOR = theme.palette.error.main;
-    const RED_DARK = theme.palette.error.dark || theme.palette.error.main;
-    const GREY_COLOR = theme.palette.grey?.[500] || '#9e9e9e';
+    const RED_DARK = theme.palette.error.dark;
     const TEXT_PRIMARY = theme.palette.text.primary;
 
-    // State for dialogs
     const [openDialog, setOpenDialog] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-
-    // Selected items
     const [selectedFormatter, setSelectedFormatter] = useState(null);
     const [formatterToDelete, setFormatterToDelete] = useState(null);
-
-    // Notifications
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
-
-    // Search and pagination
     const [searchQuery, setSearchQuery] = useState('');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [debouncedSearch, setDebouncedSearch] = useState('');
-
-    // Form data
     const [formData, setFormData] = useState(initialFormData);
 
-    // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(searchQuery);
-            setPage(0); // Reset to first page on search
+            setPage(0);
         }, 500);
-
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Fetch password formatters with React Query
     const {
         data: formattersData,
         isLoading,
@@ -131,12 +115,11 @@ export const PasswordFormatters = () => {
         keepPreviousData: true,
     });
 
-    // Create mutation
     const createMutation = useMutation({
         mutationFn: createPasswordFormatter,
         onSuccess: (data) => {
             queryClient.invalidateQueries(['passwordFormatters']);
-            setSuccess(data.message || 'Password formatter created successfully!');
+            setSuccess(data.message || 'Password formatter created successfully');
             setOpenDialog(false);
             resetForm();
         },
@@ -145,12 +128,11 @@ export const PasswordFormatters = () => {
         }
     });
 
-    // Update mutation
     const updateMutation = useMutation({
         mutationFn: updatePasswordFormatter,
         onSuccess: (data) => {
             queryClient.invalidateQueries(['passwordFormatters']);
-            setSuccess(data.message || 'Password formatter updated successfully!');
+            setSuccess(data.message || 'Password formatter updated successfully');
             setOpenDialog(false);
             resetForm();
         },
@@ -159,16 +141,13 @@ export const PasswordFormatters = () => {
         }
     });
 
-    // Delete mutation
     const deleteMutation = useMutation({
         mutationFn: deletePasswordFormatter,
         onSuccess: (data) => {
             queryClient.invalidateQueries(['passwordFormatters']);
-            setSuccess(data.message || 'Password formatter deleted successfully!');
+            setSuccess(data.message || 'Password formatter deleted successfully');
             setOpenDeleteDialog(false);
             setFormatterToDelete(null);
-
-            // Adjust page if current page becomes empty
             if (formattersData?.data?.length === 1 && page > 0) {
                 setPage(page - 1);
             }
@@ -178,62 +157,40 @@ export const PasswordFormatters = () => {
         }
     });
 
-    // Get data from query response
     const formatters = formattersData?.data || [];
     const totalCount = formattersData?.pagination?.total || 0;
 
-    // Handlers for pagination
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
+    const handleChangePage = (event, newPage) => setPage(newPage);
+    
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
     };
 
-    // Reset form
     const resetForm = () => {
         setFormData(initialFormData);
         setSelectedFormatter(null);
     };
 
-    // Handle input changes
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-
-        // Handle numeric fields
-        if (name === 'start_index' || name === 'end_index') {
-            const numValue = parseInt(value) || 0;
-            setFormData(prev => ({
-                ...prev,
-                [name]: numValue
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
-        }
+        setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Copy formatter details to clipboard
     const handleCopyFormatter = (formatter) => {
-        const text = `${formatter.start_add} (${formatter.start_index}-${formatter.end_index}) → ${formatter.end_add}`;
+        const text = `${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`;
         navigator.clipboard.writeText(text);
-        setSuccess(`Formatter "${formatter.start_add} → ${formatter.end_add}" copied to clipboard!`);
-        setTimeout(() => setSuccess(''), 2000);
+        setSuccess('Formatter copied to clipboard');
     };
 
-    // CRUD operations
     const handleOpenDialog = (formatter = null) => {
         if (formatter) {
             setSelectedFormatter(formatter);
             setFormData({
-                start_add: formatter.start_add,
-                start_index: formatter.start_index,
-                end_index: formatter.end_index,
-                end_add: formatter.end_add
+                start_add: formatter.start_add || '',
+                start_index: formatter.start_index || '',
+                end_index: formatter.end_index || '',
+                end_add: formatter.end_add || ''
             });
         } else {
             resetForm();
@@ -244,19 +201,17 @@ export const PasswordFormatters = () => {
     const handleSubmit = () => {
         const apiData = {
             start_add: formData.start_add,
-            start_index: formData.start_index,
-            end_index: formData.end_index,
+            start_index: formData.start_index === '' ? undefined : Number(formData.start_index),
+            end_index: formData.end_index === '' ? undefined : Number(formData.end_index),
             end_add: formData.end_add
         };
 
         if (selectedFormatter) {
-            // Update existing formatter
             updateMutation.mutate({
-                id: selectedFormatter.id || selectedFormatter._id,
+                id: selectedFormatter._id,
                 data: apiData
             });
         } else {
-            // Create new formatter
             createMutation.mutate(apiData);
         }
     };
@@ -268,22 +223,17 @@ export const PasswordFormatters = () => {
 
     const handleDeleteConfirm = () => {
         if (formatterToDelete) {
-            deleteMutation.mutate(formatterToDelete.id || formatterToDelete._id);
+            deleteMutation.mutate(formatterToDelete._id);
         }
     };
 
-    // Show error from query if any
     if (isError) {
         return (
             <Box p={3} textAlign="center">
                 <Alert severity="error">
                     Error loading password formatters: {queryError?.message || 'Unknown error'}
                 </Alert>
-                <Button
-                    variant="contained"
-                    onClick={() => refetch()}
-                    sx={{ mt: 2 }}
-                >
+                <Button variant="contained" onClick={() => refetch()} sx={{ mt: 2 }}>
                     Retry
                 </Button>
             </Box>
@@ -294,20 +244,18 @@ export const PasswordFormatters = () => {
         <Box>
             <Helmet>
                 <title>Password Formatters | Power Automate</title>
-                <meta name="description" content="SuperAdmin dashboard" />
             </Helmet>
-            {/* Header with Search */}
-            <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: { xs: 'block', lg: 'flex' } }} justifyContent="space-between" alignItems="center" mb={2}>
-                    <Box mb={1}>
+
+            <Box sx={{ mb: 3 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+                    <Box>
                         <Typography sx={{
                             fontWeight: 600,
                             mb: 0.5,
-                            fontSize: '1.1rem',
+                            fontSize: { xs: '1rem', sm: '1.1rem' },
                             background: `linear-gradient(135deg, ${GREEN_DARK} 0%, ${GREEN_COLOR} 100%)`,
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
                         }}>
                             Password Formatters
                         </Typography>
@@ -320,30 +268,25 @@ export const PasswordFormatters = () => {
                         startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />}
                         onClick={() => handleOpenDialog()}
                         size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5 }}
+                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }}
                         disabled={createMutation.isLoading}
                     >
                         Add Formatter
                     </GradientButton>
                 </Box>
+            </Box>
 
-                {/* Search Bar */}
+            <Box mb={3}>
                 <StyledTextField
                     fullWidth
                     placeholder="Search by start_add or end_add..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     size="small"
-                    sx={{
-                        '& .MuiInputBase-input': {
-                            fontSize: '0.8rem',
-                            color: TEXT_PRIMARY,
-                        },
-                    }}
+                    sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY } }}
                 />
             </Box>
 
-            {/* Formatters Table */}
             <TableContainer
                 component={Paper}
                 elevation={0}
@@ -351,9 +294,9 @@ export const PasswordFormatters = () => {
                     borderRadius: 1.5,
                     border: `1px solid ${theme.palette.divider}`,
                     backgroundColor: theme.palette.background.paper,
-                    overflow: 'hidden',
+                    overflow: 'auto',
                     position: 'relative',
-                    minHeight: 300,
+                    minHeight: 400,
                 }}
             >
                 {isLoading && (
@@ -373,58 +316,26 @@ export const PasswordFormatters = () => {
                     </Box>
                 )}
 
-                <Table size="small">
+                <Table size="medium">
                     <TableHead>
                         <TableRow sx={{
-                            backgroundColor: theme.palette.mode === 'dark'
-                                ? alpha(GREEN_COLOR, 0.1)
-                                : alpha(GREEN_COLOR, 0.05),
+                            backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05)
                         }}>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${GREEN_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>Start Add</TableCell>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${GREEN_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>Start Index</TableCell>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${GREEN_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>End Index</TableCell>
-                            <TableCell sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${GREEN_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>End Add</TableCell>
-                            <TableCell align="right" sx={{
-                                fontWeight: 600,
-                                color: TEXT_PRIMARY,
-                                borderBottom: `2px solid ${GREEN_COLOR}`,
-                                fontSize: '0.8rem',
-                                py: 1,
-                            }}>Actions</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Start Add</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Start Index</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>End Index</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>End Add</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {!isLoading && formatters.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
-                                    <Box py={2}>
-                                        <FormatIcon sx={{ fontSize: 32, color: alpha(TEXT_PRIMARY, 0.2), mb: 1.5 }} />
-                                        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: TEXT_PRIMARY }}>
-                                            {debouncedSearch ? 'No password formatters found matching your search.' : 'No password formatters found. Add one to get started.'}
+                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                    <Box py={3}>
+                                        <FormatIcon sx={{ fontSize: 48, color: alpha(TEXT_PRIMARY, 0.2), mb: 2 }} />
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
+                                            {debouncedSearch ? 'No password formatters found matching your search' : 'No password formatters found. Add one to get started'}
                                         </Typography>
                                     </Box>
                                 </TableCell>
@@ -432,102 +343,77 @@ export const PasswordFormatters = () => {
                         ) : (
                             formatters.map((formatter) => (
                                 <TableRow
-                                    key={formatter._id || formatter.id}
+                                    key={formatter._id}
                                     hover
                                     sx={{
-                                        '&:hover': {
-                                            backgroundColor: theme.palette.mode === 'dark'
-                                                ? alpha(GREEN_COLOR, 0.05)
-                                                : alpha(GREEN_COLOR, 0.03),
-                                        },
-                                        '&:last-child td': {
-                                            borderBottom: 0,
-                                        },
-                                        opacity: deleteMutation.isLoading && (formatterToDelete?._id === formatter._id || formatterToDelete?.id === formatter.id) ? 0.5 : 1,
+                                        '&:hover': { backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.05 : 0.03) },
+                                        '&:last-child td': { borderBottom: 0 },
+                                        opacity: deleteMutation.isLoading && formatterToDelete?._id === formatter._id ? 0.5 : 1,
                                     }}
                                 >
-                                    <TableCell sx={{ py: 1 }}>
+                                    <TableCell sx={{ py: 1.5 }}>
                                         <Chip
-                                            label={formatter.start_add}
+                                            label={formatter.start_add || '—'}
                                             size="small"
                                             sx={{
                                                 backgroundColor: alpha(GREEN_COLOR, 0.1),
                                                 color: GREEN_COLOR,
                                                 fontWeight: 500,
-                                                fontSize: '0.7rem',
-                                                height: 20,
+                                                fontSize: '0.75rem',
+                                                height: 24,
                                                 fontFamily: 'monospace',
                                             }}
                                         />
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Typography variant="caption" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
                                             {formatter.start_index}
                                         </Typography>
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
-                                        <Typography variant="caption" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                    <TableCell sx={{ py: 1.5 }}>
+                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
                                             {formatter.end_index}
                                         </Typography>
                                     </TableCell>
-                                    <TableCell sx={{ py: 1 }}>
+                                    <TableCell sx={{ py: 1.5 }}>
                                         <Chip
-                                            label={formatter.end_add}
+                                            label={formatter.end_add || '—'}
                                             size="small"
                                             sx={{
                                                 backgroundColor: alpha(GREEN_COLOR, 0.1),
                                                 color: GREEN_COLOR,
                                                 fontWeight: 500,
-                                                fontSize: '0.7rem',
-                                                height: 20,
+                                                fontSize: '0.75rem',
+                                                height: 24,
                                                 fontFamily: 'monospace',
                                             }}
                                         />
                                     </TableCell>
-                                    <TableCell align="right" sx={{ py: 1 }}>
-                                        <Tooltip title="Copy Formatter">
+                                    <TableCell align="right" sx={{ py: 1.5 }}>
+                                        <Tooltip title="Copy formatter">
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleCopyFormatter(formatter)}
-                                                sx={{
-                                                    color: GREEN_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': {
-                                                        backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                                    },
-                                                }}
-                                                disabled={updateMutation.isLoading || deleteMutation.isLoading}
+                                                sx={{ color: GREEN_COLOR, fontSize: '0.9rem', mr: 0.5 }}
                                             >
                                                 <CopyIcon fontSize="inherit" />
                                             </IconButton>
                                         </Tooltip>
-                                        <Tooltip title="Edit Formatter">
+                                        <Tooltip title="Edit formatter">
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleOpenDialog(formatter)}
-                                                sx={{
-                                                    color: GREEN_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': {
-                                                        backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                                    },
-                                                }}
+                                                sx={{ color: GREEN_COLOR, fontSize: '0.9rem', mr: 0.5 }}
                                                 disabled={updateMutation.isLoading || deleteMutation.isLoading}
                                             >
                                                 <EditIcon fontSize="inherit" />
                                             </IconButton>
                                         </Tooltip>
-                                        <Tooltip title="Delete Formatter">
+                                        <Tooltip title="Delete formatter">
                                             <IconButton
                                                 size="small"
                                                 onClick={() => handleDeleteClick(formatter)}
-                                                sx={{
-                                                    color: RED_COLOR,
-                                                    fontSize: '0.8rem',
-                                                    '&:hover': {
-                                                        backgroundColor: alpha(RED_COLOR, 0.1),
-                                                    },
-                                                }}
+                                                sx={{ color: RED_COLOR, fontSize: '0.9rem' }}
                                                 disabled={updateMutation.isLoading || deleteMutation.isLoading || formatter.isInUse}
                                             >
                                                 <DeleteIcon fontSize="inherit" />
@@ -540,7 +426,6 @@ export const PasswordFormatters = () => {
                     </TableBody>
                 </Table>
 
-                {/* Pagination */}
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25, 50]}
                     component="div"
@@ -552,124 +437,86 @@ export const PasswordFormatters = () => {
                     sx={{
                         borderTop: `1px solid ${theme.palette.divider}`,
                         '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                            fontSize: '0.75rem',
+                            fontSize: '0.8rem',
                             color: TEXT_PRIMARY,
                         },
+                        '& .MuiTablePagination-actions': {
+                            marginLeft: 2,
+                        },
                     }}
-                    size="small"
                 />
             </TableContainer>
 
-            {/* Add/Edit Dialog */}
             <Dialog
                 open={openDialog}
-                onClose={() => {
-                    setOpenDialog(false);
-                    resetForm();
-                }}
+                onClose={() => { setOpenDialog(false); resetForm(); }}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{
-                    color: TEXT_PRIMARY,
-                    fontWeight: 600,
-                    fontSize: '0.95rem',
-                    py: 1.5,
-                    px: 2,
+                <DialogTitle sx={{ 
+                    color: TEXT_PRIMARY, 
+                    fontWeight: 600, 
+                    fontSize: '1rem', 
+                    py: 2, 
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
                     {selectedFormatter ? 'Edit Password Formatter' : 'Add New Password Formatter'}
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={12} sm={6}>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <Grid container spacing={2.5} sx={{ mt: 2 }}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <StyledTextField
                                 fullWidth
                                 label="Start Add"
                                 name="start_add"
                                 value={formData.start_add}
                                 onChange={handleInputChange}
-                                required
                                 size="small"
-                                sx={{
-                                    '& .MuiInputBase-input': {
-                                        fontSize: '0.8rem',
-                                        color: TEXT_PRIMARY,
-                                    },
-                                }}
+                                placeholder="Enter start add"
                             />
                         </Grid>
-                        <Grid item xs={12} sm={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <StyledTextField
+                                fullWidth
+                                label="Start Index"
+                                name="start_index"
+                                value={formData.start_index}
+                                onChange={handleInputChange}
+                                size="small"
+                                placeholder="Enter start index"
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
+                            <StyledTextField
+                                fullWidth
+                                label="End Index"
+                                name="end_index"
+                                value={formData.end_index}
+                                onChange={handleInputChange}
+                                size="small"
+                                placeholder="Enter end index"
+                            />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <StyledTextField
                                 fullWidth
                                 label="End Add"
                                 name="end_add"
                                 value={formData.end_add}
                                 onChange={handleInputChange}
-                                required
                                 size="small"
-                                sx={{
-                                    '& .MuiInputBase-input': {
-                                        fontSize: '0.8rem',
-                                        color: TEXT_PRIMARY,
-                                    },
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <StyledTextField
-                                fullWidth
-                                label="Start Index"
-                                name="start_index"
-                                type="number"
-                                value={formData.start_index}
-                                onChange={handleInputChange}
-                                required
-                                size="small"
-                                InputProps={{ inputProps: { min: 0, max: 999 } }}
-                                sx={{
-                                    '& .MuiInputBase-input': {
-                                        fontSize: '0.8rem',
-                                        color: TEXT_PRIMARY,
-                                    },
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <StyledTextField
-                                fullWidth
-                                label="End Index"
-                                name="end_index"
-                                type="number"
-                                value={formData.end_index}
-                                onChange={handleInputChange}
-                                required
-                                size="small"
-                                InputProps={{ inputProps: { min: 0, max: 999 } }}
-                                sx={{
-                                    '& .MuiInputBase-input': {
-                                        fontSize: '0.8rem',
-                                        color: TEXT_PRIMARY,
-                                    },
-                                }}
+                                placeholder="Enter end add"
                             />
                         </Grid>
                     </Grid>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
-                        onClick={() => {
-                            setOpenDialog(false);
-                            resetForm();
-                        }}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        onClick={() => { setOpenDialog(false); resetForm(); }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                         disabled={createMutation.isLoading || updateMutation.isLoading}
                     >
                         Cancel
@@ -677,12 +524,12 @@ export const PasswordFormatters = () => {
                     <GradientButton
                         onClick={handleSubmit}
                         variant="contained"
-                        disabled={!formData.start_add || !formData.end_add || createMutation.isLoading || updateMutation.isLoading}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        disabled={createMutation.isLoading || updateMutation.isLoading}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                     >
                         {createMutation.isLoading || updateMutation.isLoading ? (
-                            <CircularProgress size={16} sx={{ color: 'white' }} />
+                            <CircularProgress size={18} sx={{ color: 'white' }} />
                         ) : (
                             selectedFormatter ? 'Update' : 'Create'
                         )}
@@ -690,50 +537,41 @@ export const PasswordFormatters = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={openDeleteDialog}
                 onClose={() => setOpenDeleteDialog(false)}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        backgroundColor: theme.palette.background.paper,
-                        p: 1,
-                    }
-                }}
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{
-                    pb: 1,
-                    color: RED_COLOR,
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    py: 1.5,
-                    px: 2,
+                <DialogTitle sx={{ 
+                    color: RED_COLOR, 
+                    fontWeight: 600, 
+                    fontSize: '1rem', 
+                    py: 2, 
+                    px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
-                    <Box display="flex" alignItems="center" gap={0.75}>
-                        <DeleteIcon sx={{ fontSize: '0.9rem' }} />
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <DeleteIcon sx={{ fontSize: '1.1rem' }} />
                         Confirm Delete
                     </Box>
                 </DialogTitle>
-                <DialogContent sx={{ px: 2, py: 1 }}>
-                    <Box py={0.5}>
-                        <DialogContentText sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                            Are you sure you want to delete password formatter <strong>"{formatterToDelete?.start_add} → {formatterToDelete?.end_add}"</strong>?
-                            {formatterToDelete?.isInUse && (
-                                <Box component="span" display="block" mt={1} color={RED_COLOR}>
-                                    Warning: This formatter is currently in use by phone numbers. Deleting it will remove it from all associated phone numbers.
-                                </Box>
-                            )}
-                        </DialogContentText>
-                    </Box>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <DialogContentText sx={{ fontSize: '0.9rem', color: TEXT_PRIMARY }}>
+                        Are you sure you want to delete password formatter <strong>"{formatterToDelete?.start_add || ''} → {formatterToDelete?.end_add || ''}"</strong>?
+                        {formatterToDelete?.isInUse && (
+                            <Box component="span" display="block" mt={1.5} color={RED_COLOR} sx={{ fontSize: '0.85rem' }}>
+                                This formatter is currently in use by phone numbers. Deleting it will remove it from all associated phone numbers.
+                            </Box>
+                        )}
+                    </DialogContentText>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, py: 1.5 }}>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
                     <OutlineButton
                         onClick={() => setOpenDeleteDialog(false)}
-                        size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.4, px: 1.5 }}
+                        size="medium"
+                        sx={{ fontSize: '0.85rem', px: 2 }}
                         disabled={deleteMutation.isLoading}
                     >
                         Cancel
@@ -744,17 +582,15 @@ export const PasswordFormatters = () => {
                             background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
                             color: 'white',
                             borderRadius: 1,
-                            padding: '4px 16px',
+                            padding: '6px 16px',
                             fontWeight: 500,
-                            fontSize: '0.8rem',
+                            fontSize: '0.85rem',
                             textTransform: 'none',
-                            '&:hover': {
-                                background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)`,
-                            },
+                            '&:hover': { background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)` },
                         }}
                         onClick={handleDeleteConfirm}
-                        startIcon={deleteMutation.isLoading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <DeleteIcon sx={{ fontSize: '0.8rem' }} />}
-                        size="small"
+                        startIcon={deleteMutation.isLoading ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <DeleteIcon sx={{ fontSize: '0.9rem' }} />}
+                        size="medium"
                         disabled={deleteMutation.isLoading}
                     >
                         {deleteMutation.isLoading ? 'Deleting...' : 'Delete'}
@@ -762,71 +598,53 @@ export const PasswordFormatters = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Success Snackbar */}
             <Snackbar
                 open={!!success}
                 autoHideDuration={3000}
                 onClose={() => setSuccess('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert
-                    severity="success"
+                <Alert 
+                    severity="success" 
                     sx={{
                         width: '100%',
                         borderRadius: 1,
-                        backgroundColor: theme.palette.mode === 'dark'
-                            ? alpha(GREEN_COLOR, 0.1)
-                            : alpha(GREEN_COLOR, 0.05),
+                        backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
                         borderLeft: `3px solid ${GREEN_COLOR}`,
-                        '& .MuiAlert-icon': {
-                            color: GREEN_COLOR,
-                            fontSize: '0.9rem',
-                        },
-                        '& .MuiAlert-message': {
-                            fontSize: '0.8rem',
-                            py: 0.5,
-                        },
+                        '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '1rem' },
+                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
                         color: TEXT_PRIMARY,
                         py: 0.5,
-                        px: 1.5,
+                        px: 2,
                     }}
                     elevation={4}
                 >
-                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{success}</Typography>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
-            {/* Error Snackbar */}
             <Snackbar
                 open={!!error}
                 autoHideDuration={3000}
                 onClose={() => setError('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert
-                    severity="error"
+                <Alert 
+                    severity="error" 
                     sx={{
                         width: '100%',
                         borderRadius: 1,
-                        backgroundColor: theme.palette.mode === 'dark'
-                            ? alpha(RED_COLOR, 0.1)
-                            : alpha(RED_COLOR, 0.05),
+                        backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
                         borderLeft: `3px solid ${RED_COLOR}`,
-                        '& .MuiAlert-icon': {
-                            color: RED_COLOR,
-                            fontSize: '0.9rem',
-                        },
-                        '& .MuiAlert-message': {
-                            fontSize: '0.8rem',
-                            py: 0.5,
-                        },
+                        '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '1rem' },
+                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
                         color: TEXT_PRIMARY,
                         py: 0.5,
-                        px: 1.5,
+                        px: 2,
                     }}
                     elevation={4}
                 >
-                    <Typography fontWeight={500} sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>{error}</Typography>
+                    <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{error}</Typography>
                 </Alert>
             </Snackbar>
         </Box>
