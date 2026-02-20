@@ -249,12 +249,6 @@ export const PasswordFormatters = () => {
             end_add: formData.end_add
         };
 
-        // Validate indices
-        if (apiData.start_index > apiData.end_index) {
-            setError('Start index must be less than or equal to end index');
-            return;
-        }
-
         if (selectedFormatter) {
             // Update existing formatter
             updateMutation.mutate({
