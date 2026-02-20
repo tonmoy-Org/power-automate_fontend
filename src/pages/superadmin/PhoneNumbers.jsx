@@ -627,11 +627,11 @@ export const PhoneNumbers = () => {
                         <Grid size={{ xs: 12, md: 6 }}>
                             <StyledTextField
                                 fullWidth
-                                label="Browser Reset Time"
+                                label="Browser Reset"
                                 name="browser_reset_time"
                                 value={formData.browser_reset_time}
                                 onChange={handleInputChange}
-                                placeholder="Enter minutes"
+                                placeholder="Browser Reset Value"
                                 size="small"
                             />
                         </Grid>
