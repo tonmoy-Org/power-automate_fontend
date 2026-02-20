@@ -28,7 +28,7 @@ export default function DashboardFooter() {
             color: theme.palette.text.primary,
           }}
         >
-          © {currentYear} Finance Dashboard. All rights reserved.
+          © {currentYear} Power Automate. All rights reserved.
         </Typography>
       </Container>
     </Box>

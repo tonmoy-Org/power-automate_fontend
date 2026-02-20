@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
-import { Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff } from 'lucide-react';
 import {
   Box,
   Paper,
@@ -108,7 +108,7 @@ export const Login = () => {
                 fontSize: '1.5rem',
               }}
             >
-              Finance Management
+              Power Automation
             </Typography>
             <Typography sx={{ color: TEXT_PRIMARY, fontSize: '0.9rem' }}>
               Sign in to your account

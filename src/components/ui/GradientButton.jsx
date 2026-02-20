@@ -14,7 +14,6 @@ const GradientButton = styled(Button)(({ theme }) => ({
     '&:hover': {
         background: 'linear-gradient(135deg, #0D47A1 0%, #1565C0 100%)',
         boxShadow: '0 6px 14px rgba(21, 101, 192, 0.35)',
-        transform: 'translateY(-1px)',
     },
 
     '&:disabled': {

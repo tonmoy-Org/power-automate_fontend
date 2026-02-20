@@ -7,7 +7,7 @@ export const SuperAdminProfile = () => {
     return (
         <Box>
             <Helmet>
-                <title>Super Admin Profile | Finance Dashboard</title>
+                <title>Super Admin Profile | Power Automate</title>
                 <meta name="description" content="Super administrator profile management dashboard" />
             </Helmet>
             <ProfilePage roleLabel="Super Admin" />

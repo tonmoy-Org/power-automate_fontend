@@ -1,5 +1,5 @@
 import React from 'react';
-import { styled, useTheme, alpha, createTheme, ThemeProvider } from '@mui/material/styles';
+import { styled, alpha, createTheme, ThemeProvider } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import MuiDrawer from '@mui/material/Drawer';
 import MuiAppBar from '@mui/material/AppBar';
@@ -14,7 +14,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -26,7 +25,7 @@ import MenuItem from '@mui/material/MenuItem';
 import { useAuth } from '../auth/AuthProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import logo from '../public/logo.png';
+import logo from '../public/logo.svg';
 import { ExpandLess, ExpandMore, Menu as MenuIcon, MoreVert } from '@mui/icons-material';
 import DashboardFooter from './DashboardFooter';
 import Dialog from '@mui/material/Dialog';
@@ -155,6 +154,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
   const [modalOpen, setModalOpen] = React.useState(false);
   const [tabValue, setTabValue] = React.useState(0);
   const [mode, setMode] = React.useState('system');
+  const [expandedItems, setExpandedItems] = React.useState({});
 
   const effectiveMode = mode === 'system' ? (prefersDarkMode ? 'dark' : 'light') : mode;
 
@@ -383,6 +383,129 @@ export default function DashboardLayout({ children, title, menuItems }) {
     setTabValue(index);
   };
 
+  const toggleExpand = (itemText) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [itemText]: !prev[itemText]
+    }));
+  };
+
+  const handleItemClick = (item) => {
+    // If item has subItems and is expandable, toggle expansion
+    if (item.subItems && item.subItems.length > 0 && open) {
+      toggleExpand(item.text);
+    } else if (item.path) {
+      // If it's a regular item with a path, navigate
+      handleNavigation(item.path);
+    } else if (item.onClick) {
+      // If it has a custom onClick handler
+      item.onClick();
+    }
+  };
+
+  // Render enhanced tooltip content for collapsed drawer items
+  const renderCollapsedTooltip = (item) => {
+    const hasSubItems = item.subItems && item.subItems.length > 0;
+
+    return (
+      <Box sx={{ py: 0.5, minWidth: 180 }}>
+        {/* Main item with clickable link */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            mb: hasSubItems ? 0.5 : 0,
+            cursor: 'pointer',
+            p: 0.75,
+            borderRadius: 1,
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.action.hover, 0.1),
+            }
+          }}
+          onClick={() => {
+            if (item.path) {
+              handleNavigation(item.path);
+            } else if (item.onClick) {
+              item.onClick();
+            }
+          }}
+        >
+          <Box sx={{ color: theme.palette.primary.main }}>
+            {React.cloneElement(item.icon, { sx: { fontSize: 16 } })}
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 600, fontSize: '0.8rem', color: theme.palette.text.primary, lineHeight: 1.2 }}>
+              {item.text}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Sub items if they exist */}
+        {hasSubItems && (
+          <Box sx={{
+            mt: 0.5,
+            borderTop: `1px solid ${theme.palette.divider}`,
+            pt: 0.5
+          }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              {item.subItems.slice(0, 5).map((subItem, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 0.75,
+                    py: 0.5,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.action.hover, 0.1),
+                    }
+                  }}
+                  onClick={() => {
+                    if (subItem.path) {
+                      handleNavigation(subItem.path);
+                    } else if (subItem.onClick) {
+                      subItem.onClick();
+                    }
+                  }}
+                >
+                  {subItem.icon && (
+                    <Box sx={{ color: theme.palette.text.secondary }}>
+                      {React.cloneElement(subItem.icon, { sx: { fontSize: 14 } })}
+                    </Box>
+                  )}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.primary, lineHeight: 1.2, fontWeight: 500 }}>
+                      {subItem.text}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+              {item.subItems.length > 5 && (
+                <Box
+                  sx={{
+                    px: 0.75,
+                    py: 0.25,
+                    borderRadius: 1,
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    textAlign: 'center',
+                  }}
+                >
+                  <Typography sx={{ fontSize: '0.7rem', color: theme.palette.primary.main, lineHeight: 1.2 }}>
+                    +{item.subItems.length - 5} more
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
   const renderDrawerContent = () => (
     <Box
       sx={{
@@ -451,15 +574,15 @@ export default function DashboardLayout({ children, title, menuItems }) {
               <Box
                 sx={{
                   px: 2.5,
-                  py: 0.75,
-                  mb: 0.5,
+                  py: 0.5,
+                  mb: 0.25,
                 }}
               >
                 <Typography
                   variant="caption"
                   sx={{
                     color: theme.palette.text.secondary,
-                    fontSize: '0.7rem',
+                    fontSize: '0.65rem',
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
@@ -474,122 +597,131 @@ export default function DashboardLayout({ children, title, menuItems }) {
             {/* Section Items */}
             <List sx={{ py: 0.25 }}>
               {section.items.map((item) => {
-                const isExpandable = item.isExpandable;
-                const isExpanded = item.expanded;
                 const hasSubItems = item.subItems && item.subItems.length > 0;
+                const isExpanded = expandedItems[item.text];
 
                 const mainButton = (
                   <ListItemButton
-                    onClick={item.onClick}
+                    onClick={() => handleItemClick(item)}
                     sx={[
                       getActiveStyles(item.path),
                       {
-                        minHeight: 40,
+                        minHeight: 36,
                         flexDirection: open ? 'row' : 'column',
                         justifyContent: open ? 'flex-start' : 'center',
                         alignItems: 'center',
-                        gap: open ? 1.5 : 0.25,
+                        gap: open ? 1.5 : 0,
                         px: open ? 2 : 1,
-                        py: open ? 0.6 : 0.75,
+                        py: open ? 0.75 : 0.5,
                         '& .MuiListItemIcon-root': {
                           minWidth: 0,
                           mr: open ? 1.5 : 0,
                           justifyContent: 'center',
+                          mt: open ? 0.25 : 0,
                         },
                         '& .MuiListItemText-root': {
                           m: 0,
                         },
                       },
-                      isExpandable && {
-                        pr: 1.2,
+                      hasSubItems && {
+                        pr: 1,
                       },
                     ]}
                   >
                     <ListItemIcon>
                       {React.cloneElement(item.icon, {
                         sx: {
-                          fontSize: 18,
-                          color: theme.palette.primary.main,
+                          fontSize: 16,
+                          color: isRouteActive(item.path)
+                            ? theme.palette.primary.main
+                            : theme.palette.text.secondary,
                         },
                       })}
                     </ListItemIcon>
                     {open && (
-                      <ListItemText
-                        primary={
-                          <Typography
-                            sx={{
-                              fontSize: '0.8rem',
-                              fontWeight: 500,
-                              lineHeight: 1.2,
-                              color: 'inherit',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              letterSpacing: '0.01em',
-                            }}
-                          >
-                            {item.text}
-                          </Typography>
-                        }
-                      />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          sx={{
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            lineHeight: 1.2,
+                            color: 'inherit',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            letterSpacing: '0.01em',
+                          }}
+                        >
+                          {item.text}
+                        </Typography>
+                      </Box>
                     )}
-                    {!open && (
-                      <Typography
-                        sx={{
-                          fontSize: '0.6rem',
-                          fontWeight: 500,
-                          lineHeight: 1.2,
-                          mt: 0.25,
-                          textAlign: 'center',
-                          color: 'inherit',
-                          letterSpacing: '0.01em',
-                        }}
-                      >
-                        {item.text.split(' ').map((word) => word.charAt(0)).join('')}
-                      </Typography>
-                    )}
-                    {isExpandable && open && hasSubItems && (
+                    {hasSubItems && open && (
                       <ListItemIcon
                         sx={{
                           minWidth: 0,
                           ml: 'auto',
                           color: 'inherit',
                           opacity: 0.7,
+                          mt: 0.25,
                         }}
                       >
-                        {isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+                        {isExpanded ? <ExpandLess sx={{ fontSize: 14 }} /> : <ExpandMore sx={{ fontSize: 14 }} />}
                       </ListItemIcon>
                     )}
                   </ListItemButton>
                 );
 
                 // Wrap in tooltip for collapsed state
-                const wrappedButton = open || !isMobile ? (
+                const wrappedButton = open ? (
                   mainButton
                 ) : (
                   <Tooltip
-                    title={item.text}
+                    title={renderCollapsedTooltip(item)}
                     placement="right"
                     arrow
+                    enterDelay={0}
+                    leaveDelay={100}
                     componentsProps={{
                       tooltip: {
                         sx: {
-                          backgroundColor: theme.palette.background.paper,
-                          fontSize: '0.75rem',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          backdropFilter: 'blur(5px)',
+                          boxShadow: 0.5,
+                          transition: 'all 0.3s ease',
+                          fontSize: '0.7rem',
+                          padding: '8px',
+                          borderRadius: '8px',
                           color: theme.palette.text.primary,
                           border: `1px solid ${theme.palette.divider}`,
+                          boxShadow: theme.shadows[4],
+                          maxWidth: 240,
+                          cursor: 'default',
                         },
                       },
                       arrow: {
                         sx: {
                           color: theme.palette.background.paper,
+                          '&:before': {
+                            border: `1px solid ${theme.palette.divider}`,
+                          },
                         },
                       },
                     }}
+                    PopperProps={{
+                      modifiers: [
+                        {
+                          name: 'offset',
+                          options: {
+                            offset: [0, 8],
+                          },
+                        },
+                      ],
+                    }}
                   >
-                    {mainButton}
+                    <span style={{ display: 'flex', width: '100%' }}>
+                      {mainButton}
+                    </span>
                   </Tooltip>
                 );
 
@@ -604,19 +736,19 @@ export default function DashboardLayout({ children, title, menuItems }) {
                       {wrappedButton}
                     </ListItem>
 
-                    {/* Sub-items */}
-                    {isExpandable && isExpanded && hasSubItems && open && (
+                    {/* Sub-items in expanded drawer */}
+                    {hasSubItems && isExpanded && open && (
                       <Box
                         sx={{
                           borderRadius: '0 0 6px 6px',
-                          ml: 3.5,
+                          ml: 3,
                           mr: 0.5,
-                          mb: 0.5,
+                          mb: 0.25,
                         }}
                       >
                         <List
                           sx={{
-                            py: 0.5,
+                            py: 0.25,
                             pl: 0,
                           }}
                         >
@@ -629,49 +761,52 @@ export default function DashboardLayout({ children, title, menuItems }) {
                               }}
                             >
                               <ListItemButton
-                                onClick={subItem.onClick}
+                                onClick={() => {
+                                  if (subItem.path) {
+                                    handleNavigation(subItem.path);
+                                  } else if (subItem.onClick) {
+                                    subItem.onClick();
+                                  }
+                                }}
                                 sx={[
                                   getSubItemActiveStyles(subItem.path),
                                   {
-                                    minHeight: 34,
+                                    minHeight: 36,
                                     px: 2,
-                                    py: 0.4,
+                                    py: 0.5,
                                     ml: 0.5,
-                                    '& .MuiTypography-root': {
-                                      fontSize: '0.78rem',
-                                    },
+                                    alignItems: 'center',
                                   },
                                 ]}
                               >
                                 {subItem.icon && (
                                   <ListItemIcon
                                     sx={{
-                                      minWidth: 28,
+                                      minWidth: 26,
                                       color: theme.palette.primary.main,
                                       opacity: 0.8,
+                                      mt: 0.25,
                                     }}
                                   >
                                     {React.cloneElement(subItem.icon, {
-                                      sx: { fontSize: 15, color: theme.palette.primary.main, },
+                                      sx: { fontSize: 14, color: theme.palette.primary.main, },
                                     })}
                                   </ListItemIcon>
                                 )}
-                                <ListItemText
-                                  primary={
-                                    <Typography
-                                      sx={{
-                                        fontSize: '0.78rem',
-                                        fontWeight: 400,
-                                        color: 'inherit',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                      }}
-                                    >
-                                      {subItem.text}
-                                    </Typography>
-                                  }
-                                />
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: '0.72rem',
+                                      fontWeight: 500,
+                                      color: 'inherit',
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {subItem.text}
+                                  </Typography>
+                                </Box>
                               </ListItemButton>
                             </ListItem>
                           ))}
@@ -689,7 +824,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
       {/* User info and logout button at bottom */}
       <Box
         sx={{
-          p: 1.2,
+          p: 1,
           flexShrink: 0,
         }}
       >
@@ -705,15 +840,15 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 mb: 0.5,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Avatar
                   sx={{
-                    width: 28,
-                    height: 28,
+                    width: 26,
+                    height: 26,
                     bgcolor: theme.palette.primary.main,
                     color: theme.palette.primary.contrastText,
                     fontWeight: 600,
-                    fontSize: '0.8rem',
+                    fontSize: '0.75rem',
                   }}
                 >
                   {getInitials(user?.name)}
@@ -721,7 +856,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 <Box sx={{ minWidth: 0 }}>
                   <Typography
                     sx={{
-                      fontSize: '0.8rem',
+                      fontSize: '0.75rem',
                       fontWeight: 600,
                       color: theme.palette.text.primary,
                       whiteSpace: 'nowrap',
@@ -733,7 +868,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
                   </Typography>
                   <Typography
                     sx={{
-                      fontSize: '0.68rem',
+                      fontSize: '0.65rem',
                       color: theme.palette.text.secondary,
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
@@ -749,15 +884,15 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 onClick={handleDrawerMenuClick}
                 sx={{
                   color: theme.palette.text.secondary,
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   '&:hover': {
                     backgroundColor: alpha(theme.palette.action.hover, 0.1),
                     color: theme.palette.text.primary,
                   },
                 }}
               >
-                <MoreVert sx={{ fontSize: 18 }} />
+                <MoreVert sx={{ fontSize: 16 }} />
               </IconButton>
             </Box>
             <Menu
@@ -776,21 +911,21 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 sx: {
                   mt: 1,
                   ml: -1,
-                  minWidth: 160,
+                  minWidth: 150,
                   backgroundColor: theme.palette.background.paper,
                   color: theme.palette.text.primary,
                   border: `1px solid ${theme.palette.divider}`,
                   '& .MuiMenuItem-root': {
-                    fontSize: '0.8rem',
-                    py: 0.6,
-                    minHeight: 36,
+                    fontSize: '0.75rem',
+                    py: 0.5,
+                    minHeight: 32,
                     '&:hover': {
                       backgroundColor: alpha(theme.palette.action.hover, 0.1),
                     },
                     '& .MuiSvgIcon-root': {
-                      fontSize: 17,
+                      fontSize: 16,
                       color: theme.palette.text.secondary,
-                      mr: 1.2,
+                      mr: 1,
                     },
                   },
                 },
@@ -814,30 +949,68 @@ export default function DashboardLayout({ children, title, menuItems }) {
         ) : (
           // Collapsed view - only avatar with menu
           <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <IconButton
-              onClick={handleDrawerMenuClick}
-              sx={{
-                width: 40,
-                height: 40,
-                p: 0,
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.action.hover, 0.1),
+            <Tooltip
+              title={
+                <Box sx={{ py: 0.5, minWidth: 150 }}>
+                  <Typography sx={{ fontWeight: 600, fontSize: '0.8rem', color: theme.palette.text.primary, mb: 0.25, lineHeight: 1.2 }}>
+                    {user?.name || 'User'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, lineHeight: 1.2 }}>
+                    {user?.email || user?.role || 'User'}
+                  </Typography>
+                </Box>
+              }
+              placement="right"
+              arrow
+              enterDelay={0}
+              leaveDelay={100}
+              componentsProps={{
+                tooltip: {
+                  sx: {
+                    backgroundColor: theme.palette.background.paper,
+                    fontSize: '0.7rem',
+                    padding: '6px 8px',
+                    borderRadius: '6px',
+                    color: theme.palette.text.primary,
+                    border: `1px solid ${theme.palette.divider}`,
+                    boxShadow: theme.shadows[3],
+                  },
+                },
+                arrow: {
+                  sx: {
+                    color: theme.palette.background.paper,
+                    '&:before': {
+                      border: `1px solid ${theme.palette.divider}`,
+                    },
+                  },
                 },
               }}
             >
-              <Avatar
+              <IconButton
+                onClick={handleDrawerMenuClick}
                 sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: theme.palette.primary.main,
-                  color: theme.palette.primary.contrastText,
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
+                  width: 36,
+                  height: 36,
+                  p: 0,
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.action.hover, 0.1),
+                  },
                 }}
               >
-                {getInitials(user?.name)}
-              </Avatar>
-            </IconButton>
+                <Avatar
+                  sx={{
+                    width: 30,
+                    height: 30,
+                    bgcolor: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText,
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                  }}
+                >
+                  {getInitials(user?.name)}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
             <Menu
               anchorEl={drawerAnchorEl}
               open={openDrawerMenu}
@@ -854,31 +1027,31 @@ export default function DashboardLayout({ children, title, menuItems }) {
                 sx: {
                   mt: 0,
                   ml: 1,
-                  minWidth: 160,
+                  minWidth: 150,
                   backgroundColor: theme.palette.background.paper,
                   color: theme.palette.text.primary,
                   border: `1px solid ${theme.palette.divider}`,
                   '& .MuiMenuItem-root': {
-                    fontSize: '0.8rem',
-                    py: 0.6,
-                    minHeight: 36,
+                    fontSize: '0.75rem',
+                    py: 0.5,
+                    minHeight: 32,
                     '&:hover': {
                       backgroundColor: alpha(theme.palette.action.hover, 0.1),
                     },
                     '& .MuiSvgIcon-root': {
-                      fontSize: 17,
+                      fontSize: 16,
                       color: theme.palette.text.secondary,
-                      mr: 1.2,
+                      mr: 1,
                     },
                   },
                 },
               }}
             >
-              <Box sx={{ px: 1.5, py: 1.2, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: theme.palette.text.primary }}>
+              <Box sx={{ px: 1, py: 0.75, borderBottom: `1px solid ${theme.palette.divider}` }}>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: theme.palette.text.primary, lineHeight: 1.2 }}>
                   {user?.name || 'User'}
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}>
+                <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, lineHeight: 1.2 }}>
                   {user?.email || user?.role || 'User'}
                 </Typography>
               </Box>
@@ -1045,7 +1218,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
                   letterSpacing: '-0.01em',
                 }}
               >
-                Finance Dashboard
+                Power Automate Dashboard
               </Typography>
               <Typography
                 variant="body2"
@@ -1280,7 +1453,7 @@ export default function DashboardLayout({ children, title, menuItems }) {
               borderTop: `1px solid ${theme.palette.divider}`,
               backgroundColor: theme.palette.background.paper,
               pt: 1.2,
-              px: { xs: 1.2, sm: 1 },
+              px: { xs: 1.2, md: 0 },
             }}
           >
             <DashboardFooter />

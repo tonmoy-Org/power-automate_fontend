@@ -16,15 +16,15 @@ import { UserManagement } from '../pages/superadmin/UserManagement';
 
 import { MemberDashboard } from '../pages/member/MemberDashboard';
 import { MemberProfile } from '../pages/member/Profile';
-import RMEReports from '../pages/member/HMIS/RMEReports';
-import RSSReports from '../pages/member/HMIS/RSSReports';
-import TOSReports from '../pages/member/HMIS/TOSReports';
 
 
 import { ClientDashboard } from '../pages/client/ClientDashboard';
 import { ClientProfile } from '../pages/client/Profile';
 import ForgotPassword from '../pages/forgot-password/ForgotPassword';
 import ResetPassword from '../pages/reset-password/ResetPassword';
+import Forms from '../pages/superadmin/Forms';
+import PasswordFormatters from '../pages/superadmin/PasswordFormatters';
+import PhoneCredential from '../pages/superadmin/PhoneCredential';
 
 
 
@@ -70,6 +70,9 @@ export const AppRoutes = () => {
         >
           <Route index element={<SuperAdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="forms" element={<Forms />} />
+          <Route path="password-formatters" element={<PasswordFormatters />} />
+          <Route path="phone-credential" element={<PhoneCredential />} />
           <Route path="profile" element={<SuperAdminProfile />} />
         </Route>
 
@@ -84,11 +87,6 @@ export const AppRoutes = () => {
         >
           <Route index element={<MemberDashboard />} />
           <Route path="profile" element={<MemberProfile />} />
-
-          {/* Health Department Reports */}
-          <Route path="health-department-reports/rme" element={<RMEReports />} />
-          <Route path="health-department-reports/rss" element={<RSSReports />} />
-          <Route path="health-department-reports/tos" element={<TOSReports />} />
         </Route>
 
         {/* Tech Routes */}

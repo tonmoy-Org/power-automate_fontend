@@ -8,7 +8,6 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    TextField,
     Select,
     MenuItem,
     FormControl,
@@ -345,7 +344,7 @@ export const UserManagement = () => {
     return (
         <Box>
             <Helmet>
-                <title>User management | Finance Dashboard</title>
+                <title>User management | Power Automate</title>
                 <meta name="description" content="Super administrator user management dashboard" />
             </Helmet>
             <Box sx={{ display: { xs: '', lg: 'flex' } }} justifyContent="space-between" alignItems="center" mb={2}>
@@ -388,7 +387,7 @@ export const UserManagement = () => {
                     }}
                     size="small"
                     sx={{
-                        '& .MuiInputBase-input': { 
+                        '& .MuiInputBase-input': {
                             fontSize: '0.8rem',
                             color: TEXT_PRIMARY,
                         },
@@ -700,11 +699,11 @@ export const UserManagement = () => {
                             required
                             size="small"
                             sx={{
-                                '& .MuiInputBase-input': { 
+                                '& .MuiInputBase-input': {
                                     fontSize: '0.8rem',
                                     color: TEXT_PRIMARY,
                                 },
-                                '& .MuiInputLabel-root': { 
+                                '& .MuiInputLabel-root': {
                                     fontSize: '0.8rem',
                                     color: TEXT_PRIMARY,
                                 },
@@ -725,11 +724,11 @@ export const UserManagement = () => {
                             required
                             size="small"
                             sx={{
-                                '& .MuiInputBase-input': { 
+                                '& .MuiInputBase-input': {
                                     fontSize: '0.8rem',
                                     color: TEXT_PRIMARY,
                                 },
-                                '& .MuiInputLabel-root': { 
+                                '& .MuiInputLabel-root': {
                                     fontSize: '0.8rem',
                                     color: TEXT_PRIMARY,
                                 },
@@ -750,11 +749,11 @@ export const UserManagement = () => {
                             required={!selectedUser}
                             size="small"
                             sx={{
-                                '& .MuiInputBase-input': { 
+                                '& .MuiInputBase-input': {
                                     fontSize: '0.8rem',
                                     color: TEXT_PRIMARY,
                                 },
-                                '& .MuiInputLabel-root': { 
+                                '& .MuiInputLabel-root': {
                                     fontSize: '0.8rem',
                                     color: TEXT_PRIMARY,
                                 },
