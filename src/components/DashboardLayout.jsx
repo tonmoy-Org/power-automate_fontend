@@ -694,7 +694,6 @@ export default function DashboardLayout({ children, title, menuItems }) {
                           borderRadius: '8px',
                           color: theme.palette.text.primary,
                           border: `1px solid ${theme.palette.divider}`,
-                          boxShadow: theme.shadows[4],
                           maxWidth: 240,
                           cursor: 'default',
                         },
