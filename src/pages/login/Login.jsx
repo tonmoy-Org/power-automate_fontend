@@ -108,7 +108,7 @@ export const Login = () => {
                 fontSize: '1.5rem',
               }}
             >
-              Power Automation
+              Power Automate
             </Typography>
             <Typography sx={{ color: TEXT_PRIMARY, fontSize: '0.9rem' }}>
               Sign in to your account
