@@ -308,7 +308,7 @@ export const SuperAdminDashboard = () => {
                         {/* Left side - Type and count */}
                         <Box display="flex" alignItems="center" gap={1.5}>
                           <Chip
-                            label={`Type ${type}`}
+                            label={`${type}`}
                             size="small"
                             sx={{
                               fontSize: '0.75rem',
