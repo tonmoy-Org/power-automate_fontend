@@ -106,7 +106,7 @@ export const UserManagement = () => {
     }, [filteredUsers, page, rowsPerPage]);
 
     const handleChangePage = (event, newPage) => setPage(newPage);
-    
+
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
@@ -314,9 +314,6 @@ export const UserManagement = () => {
                         fontWeight: 600,
                         mb: 0.5,
                         fontSize: { xs: '1rem', sm: '1.1rem' },
-                        background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE_COLOR} 100%)`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
                     }}>
                         User Management
                     </Typography>
@@ -548,11 +545,11 @@ export const UserManagement = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{ 
-                    color: TEXT_PRIMARY, 
-                    fontWeight: 600, 
-                    fontSize: '1rem', 
-                    py: 2, 
+                <DialogTitle sx={{
+                    color: TEXT_PRIMARY,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    py: 2,
                     px: 3,
                     borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
@@ -661,11 +658,11 @@ export const UserManagement = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{ 
-                    color: RED_COLOR, 
-                    fontWeight: 600, 
-                    fontSize: '1rem', 
-                    py: 2, 
+                <DialogTitle sx={{
+                    color: RED_COLOR,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    py: 2,
                     px: 3,
                     borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
@@ -718,11 +715,11 @@ export const UserManagement = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{ 
+                <DialogTitle sx={{
                     color: userToToggle?.isActive ? RED_COLOR : GREEN_COLOR,
-                    fontWeight: 600, 
-                    fontSize: '1rem', 
-                    py: 2, 
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    py: 2,
                     px: 3,
                     borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
@@ -753,8 +750,8 @@ export const UserManagement = () => {
                         variant="contained"
                         onClick={handleToggleStatusConfirm}
                         disabled={toggleUserStatusMutation.isPending}
-                        startIcon={toggleUserStatusMutation.isPending ? 
-                            <CircularProgress size={18} sx={{ color: 'white' }} /> : 
+                        startIcon={toggleUserStatusMutation.isPending ?
+                            <CircularProgress size={18} sx={{ color: 'white' }} /> :
                             (userToToggle?.isActive ? <BlockIcon sx={{ fontSize: '0.9rem' }} /> : <CheckCircleIcon sx={{ fontSize: '0.9rem' }} />)
                         }
                         size="medium"
