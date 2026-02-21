@@ -161,7 +161,7 @@ export const PasswordFormatters = () => {
     const totalCount = formattersData?.pagination?.total || 0;
 
     const handleChangePage = (event, newPage) => setPage(newPage);
-    
+
     const handleChangeRowsPerPage = (event) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
@@ -178,7 +178,7 @@ export const PasswordFormatters = () => {
     };
 
     const handleCopyFormatter = (formatter) => {
-        const text = `${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`;
+        const text = `${formatter.start_add ?? ''} → ${formatter.start_index ?? ''} → ${formatter.end_index ?? ''} → ${formatter.end_add ?? ''}`;
         navigator.clipboard.writeText(text);
         setSuccess('Formatter copied to clipboard');
     };
@@ -187,10 +187,10 @@ export const PasswordFormatters = () => {
         if (formatter) {
             setSelectedFormatter(formatter);
             setFormData({
-                start_add: formatter.start_add || '',
-                start_index: formatter.start_index || '',
-                end_index: formatter.end_index || '',
-                end_add: formatter.end_add || ''
+                start_add: formatter.start_add ?? '',
+                start_index: formatter.start_index ?? '',
+                end_index: formatter.end_index ?? '',
+                end_add: formatter.end_add ?? ''
             });
         } else {
             resetForm();
@@ -207,10 +207,7 @@ export const PasswordFormatters = () => {
         };
 
         if (selectedFormatter) {
-            updateMutation.mutate({
-                id: selectedFormatter._id,
-                data: apiData
-            });
+            updateMutation.mutate({ id: selectedFormatter._id, data: apiData });
         } else {
             createMutation.mutate(apiData);
         }
@@ -302,10 +299,7 @@ export const PasswordFormatters = () => {
                 {isLoading && (
                     <Box
                         position="absolute"
-                        top={0}
-                        left={0}
-                        right={0}
-                        bottom={0}
+                        top={0} left={0} right={0} bottom={0}
                         display="flex"
                         alignItems="center"
                         justifyContent="center"
@@ -331,7 +325,7 @@ export const PasswordFormatters = () => {
                     <TableBody>
                         {!isLoading && formatters.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                                     <Box py={3}>
                                         <FormatIcon sx={{ fontSize: 48, color: alpha(TEXT_PRIMARY, 0.2), mb: 2 }} />
                                         <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
@@ -353,7 +347,7 @@ export const PasswordFormatters = () => {
                                 >
                                     <TableCell sx={{ py: 1.5 }}>
                                         <Chip
-                                            label={formatter.start_add || '—'}
+                                            label={formatter.start_add ?? '—'}
                                             size="small"
                                             sx={{
                                                 backgroundColor: alpha(GREEN_COLOR, 0.1),
@@ -367,17 +361,17 @@ export const PasswordFormatters = () => {
                                     </TableCell>
                                     <TableCell sx={{ py: 1.5 }}>
                                         <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                            {formatter.start_index}
+                                            {formatter.start_index ?? '—'}
                                         </Typography>
                                     </TableCell>
                                     <TableCell sx={{ py: 1.5 }}>
                                         <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                            {formatter.end_index}
+                                            {formatter.end_index ?? '—'}
                                         </Typography>
                                     </TableCell>
                                     <TableCell sx={{ py: 1.5 }}>
                                         <Chip
-                                            label={formatter.end_add || '—'}
+                                            label={formatter.end_add ?? '—'}
                                             size="small"
                                             sx={{
                                                 backgroundColor: alpha(GREEN_COLOR, 0.1),
@@ -414,7 +408,7 @@ export const PasswordFormatters = () => {
                                                 size="small"
                                                 onClick={() => handleDeleteClick(formatter)}
                                                 sx={{ color: RED_COLOR, fontSize: '0.9rem' }}
-                                                disabled={updateMutation.isLoading || deleteMutation.isLoading || formatter.isInUse}
+                                                disabled={updateMutation.isLoading || deleteMutation.isLoading}
                                             >
                                                 <DeleteIcon fontSize="inherit" />
                                             </IconButton>
@@ -440,13 +434,12 @@ export const PasswordFormatters = () => {
                             fontSize: '0.8rem',
                             color: TEXT_PRIMARY,
                         },
-                        '& .MuiTablePagination-actions': {
-                            marginLeft: 2,
-                        },
+                        '& .MuiTablePagination-actions': { marginLeft: 2 },
                     }}
                 />
             </TableContainer>
 
+            {/* Create / Edit Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={() => { setOpenDialog(false); resetForm(); }}
@@ -454,11 +447,11 @@ export const PasswordFormatters = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{ 
-                    color: TEXT_PRIMARY, 
-                    fontWeight: 600, 
-                    fontSize: '1rem', 
-                    py: 2, 
+                <DialogTitle sx={{
+                    color: TEXT_PRIMARY,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    py: 2,
                     px: 3,
                     borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
@@ -537,6 +530,7 @@ export const PasswordFormatters = () => {
                 </DialogActions>
             </Dialog>
 
+            {/* Delete Confirmation Dialog */}
             <Dialog
                 open={openDeleteDialog}
                 onClose={() => setOpenDeleteDialog(false)}
@@ -544,11 +538,11 @@ export const PasswordFormatters = () => {
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <DialogTitle sx={{ 
-                    color: RED_COLOR, 
-                    fontWeight: 600, 
-                    fontSize: '1rem', 
-                    py: 2, 
+                <DialogTitle sx={{
+                    color: RED_COLOR,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    py: 2,
                     px: 3,
                     borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
@@ -559,12 +553,9 @@ export const PasswordFormatters = () => {
                 </DialogTitle>
                 <DialogContent sx={{ px: 3, py: 2 }}>
                     <DialogContentText sx={{ fontSize: '0.9rem', color: TEXT_PRIMARY }}>
-                        Are you sure you want to delete password formatter <strong>"{formatterToDelete?.start_add || ''} → {formatterToDelete?.end_add || ''}"</strong>?
-                        {formatterToDelete?.isInUse && (
-                            <Box component="span" display="block" mt={1.5} color={RED_COLOR} sx={{ fontSize: '0.85rem' }}>
-                                This formatter is currently in use by phone numbers. Deleting it will remove it from all associated phone numbers.
-                            </Box>
-                        )}
+                        Are you sure you want to delete formatter{' '}
+                        <strong>"{formatterToDelete?.start_add ?? ''} → {formatterToDelete?.end_add ?? ''}"</strong>?
+                        This action cannot be undone.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
@@ -604,8 +595,8 @@ export const PasswordFormatters = () => {
                 onClose={() => setSuccess('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert 
-                    severity="success" 
+                <Alert
+                    severity="success"
                     sx={{
                         width: '100%',
                         borderRadius: 1,
@@ -629,8 +620,8 @@ export const PasswordFormatters = () => {
                 onClose={() => setError('')}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert 
-                    severity="error" 
+                <Alert
+                    severity="error"
                     sx={{
                         width: '100%',
                         borderRadius: 1,

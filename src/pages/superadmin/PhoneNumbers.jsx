@@ -27,7 +27,6 @@ import {
     Checkbox,
     ListItemText,
     OutlinedInput,
-    FormHelperText,
     Grid,
     Tooltip,
     DialogContentText,
@@ -43,6 +42,7 @@ import {
     CheckCircle as CheckCircleIcon,
     Block as BlockIcon,
     ContentCopy as CopyIcon,
+    DeleteSweep as DeleteSweepIcon,
 } from '@mui/icons-material';
 import GradientButton from '../../components/ui/GradientButton';
 import OutlineButton from '../../components/ui/OutlineButton';
@@ -86,7 +86,8 @@ const initialFormData = {
     country_code: '',
     number: '',
     browser_reset_time: '',
-    password_formatter_ids: []
+    password_formatter_ids: [],
+    is_active: false
 };
 
 const matchFormatterToMaster = (embeddedFormatter, masterFormatters) => {
@@ -98,6 +99,9 @@ const matchFormatterToMaster = (embeddedFormatter, masterFormatters) => {
             master.end_index === embeddedFormatter.end_index
     );
 };
+
+const formatFormatterLabel = (formatter) =>
+    `${formatter.start_add ?? ''} → ${formatter.start_index ?? ''} → ${formatter.end_index ?? ''} → ${formatter.end_add ?? ''}`;
 
 export const PhoneNumbers = () => {
     const theme = useTheme();
@@ -112,11 +116,14 @@ export const PhoneNumbers = () => {
 
     const [openDialog, setOpenDialog] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    const [openBulkDeleteDialog, setOpenBulkDeleteDialog] = useState(false);
     const [selectedNumber, setSelectedNumber] = useState(null);
     const [itemToDelete, setItemToDelete] = useState(null);
+    const [selectedRows, setSelectedRows] = useState([]);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'inactive'
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -129,6 +136,11 @@ export const PhoneNumbers = () => {
         }, 500);
         return () => clearTimeout(timer);
     }, [searchQuery]);
+
+    // Clear selected rows when page/search/filter changes
+    useEffect(() => {
+        setSelectedRows([]);
+    }, [page, rowsPerPage, debouncedSearch, statusFilter]);
 
     const {
         data: phoneNumbersData,
@@ -192,9 +204,60 @@ export const PhoneNumbers = () => {
         }
     });
 
-    const phoneNumbers = phoneNumbersData?.data || [];
+    const [bulkDeleting, setBulkDeleting] = useState(false);
+
+    const handleBulkDelete = async () => {
+        setBulkDeleting(true);
+        let successCount = 0;
+        let failCount = 0;
+        for (const id of selectedRows) {
+            try {
+                await deletePhoneNumber(id);
+                successCount++;
+            } catch {
+                failCount++;
+            }
+        }
+        setBulkDeleting(false);
+        setOpenBulkDeleteDialog(false);
+        setSelectedRows([]);
+        queryClient.invalidateQueries(['phoneNumbers']);
+        if (failCount === 0) {
+            setSuccess(`${successCount} phone number${successCount > 1 ? 's' : ''} deleted successfully`);
+        } else {
+            setError(`${successCount} deleted, ${failCount} failed`);
+        }
+    };
+
+    const allPhoneNumbers = phoneNumbersData?.data || [];
     const totalCount = phoneNumbersData?.pagination?.total || 0;
     const passwordFormatters = formattersData?.data || [];
+
+    // Client-side filter by status
+    const phoneNumbers = statusFilter === 'all'
+        ? allPhoneNumbers
+        : allPhoneNumbers.filter(item =>
+            statusFilter === 'active' ? item.is_active : !item.is_active
+        );
+
+    // Select all only across visible (filtered) rows
+    const allVisibleIds = phoneNumbers.map(item => item._id);
+    const allSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedRows.includes(id));
+    const someSelected = selectedRows.length > 0 && !allSelected;
+
+    const handleSelectAll = () => {
+        if (allSelected) {
+            setSelectedRows(prev => prev.filter(id => !allVisibleIds.includes(id)));
+        } else {
+            setSelectedRows(prev => [...new Set([...prev, ...allVisibleIds])]);
+        }
+    };
+
+    const handleSelectRow = (id) => {
+        setSelectedRows(prev =>
+            prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
+        );
+    };
 
     const getSelectedFormatterIds = (phoneNumber) => {
         if (!phoneNumber?.password_formatters || !Array.isArray(phoneNumber.password_formatters)) {
@@ -259,6 +322,7 @@ export const PhoneNumbers = () => {
                 number: number.number || '',
                 browser_reset_time: number.browser_reset_time || '',
                 password_formatter_ids: selectedIds,
+                is_active: number.is_active || false,
                 _pendingFormatters: passwordFormatters.length === 0 ? number.password_formatters : null,
             });
         } else {
@@ -302,7 +366,8 @@ export const PhoneNumbers = () => {
             country_code: formData.country_code,
             number: formData.number,
             browser_reset_time: formData.browser_reset_time === '' ? undefined : Number(formData.browser_reset_time),
-            password_formatters: selectedFormatters
+            password_formatters: selectedFormatters,
+            ...(selectedNumber && { is_active: formData.is_active })
         };
 
         if (selectedNumber) {
@@ -370,19 +435,43 @@ export const PhoneNumbers = () => {
                         Manage phone numbers and password formatters
                     </Typography>
                 </Box>
-                <GradientButton
-                    variant="contained"
-                    startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />}
-                    onClick={() => handleOpenDialog()}
-                    size="small"
-                    sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }}
-                    disabled={createMutation.isLoading}
-                >
-                    Add Phone Number
-                </GradientButton>
+                <Box display="flex" gap={1} alignItems="center">
+                    {selectedRows.length > 0 && (
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<DeleteSweepIcon sx={{ fontSize: '0.9rem' }} />}
+                            onClick={() => setOpenBulkDeleteDialog(true)}
+                            sx={{
+                                background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
+                                color: 'white',
+                                fontSize: '0.8rem',
+                                py: 0.6,
+                                px: 1.5,
+                                height: 36,
+                                textTransform: 'none',
+                                fontWeight: 500,
+                                '&:hover': { background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)` },
+                            }}
+                        >
+                            Delete ({selectedRows.length})
+                        </Button>
+                    )}
+                    <GradientButton
+                        variant="contained"
+                        startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />}
+                        onClick={() => handleOpenDialog()}
+                        size="small"
+                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }}
+                        disabled={createMutation.isLoading}
+                    >
+                        Add Phone Number
+                    </GradientButton>
+                </Box>
             </Box>
 
-            <Box mb={3}>
+            {/* Search + Status Filter */}
+            <Box mb={3} display="flex" gap={2} alignItems="center">
                 <StyledTextField
                     fullWidth
                     placeholder="Search by PA ID, phone number, or country code..."
@@ -394,6 +483,33 @@ export const PhoneNumbers = () => {
                     size="small"
                     sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY } }}
                 />
+                <FormControl size="small" sx={{ minWidth: 140, flexShrink: 0 }}>
+                    <InputLabel sx={{ fontSize: '0.85rem' }}>Status</InputLabel>
+                    <Select
+                        value={statusFilter}
+                        label="Status"
+                        onChange={(e) => {
+                            setStatusFilter(e.target.value);
+                            setPage(0);
+                            setSelectedRows([]);
+                        }}
+                        sx={{ fontSize: '0.85rem' }}
+                    >
+                        <MenuItem value="all" sx={{ fontSize: '0.85rem' }}>All</MenuItem>
+                        <MenuItem value="active" sx={{ fontSize: '0.85rem' }}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <CheckCircleIcon sx={{ fontSize: '0.85rem', color: GREEN_COLOR }} />
+                                Active
+                            </Box>
+                        </MenuItem>
+                        <MenuItem value="inactive" sx={{ fontSize: '0.85rem' }}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                                <BlockIcon sx={{ fontSize: '0.85rem', color: RED_COLOR }} />
+                                Inactive
+                            </Box>
+                        </MenuItem>
+                    </Select>
+                </FormControl>
             </Box>
 
             <TableContainer
@@ -412,10 +528,7 @@ export const PhoneNumbers = () => {
                 {isLoading && (
                     <Box
                         position="absolute"
-                        top={0}
-                        left={0}
-                        right={0}
-                        bottom={0}
+                        top={0} left={0} right={0} bottom={0}
                         display="flex"
                         alignItems="center"
                         justifyContent="center"
@@ -431,6 +544,16 @@ export const PhoneNumbers = () => {
                         <TableRow sx={{
                             backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05)
                         }}>
+                            {/* Select all checkbox */}
+                            <TableCell padding="checkbox" sx={{ borderBottom: `2px solid ${BLUE_COLOR}`, pl: 1.5 }}>
+                                <Checkbox
+                                    size="small"
+                                    checked={allSelected}
+                                    indeterminate={someSelected}
+                                    onChange={handleSelectAll}
+                                    disabled={phoneNumbers.length === 0}
+                                />
+                            </TableCell>
                             <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>PA ID</TableCell>
                             <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Country Code</TableCell>
                             <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${BLUE_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Phone Number</TableCell>
@@ -443,127 +566,139 @@ export const PhoneNumbers = () => {
                     <TableBody>
                         {!isLoading && phoneNumbers.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                                     <Box py={3}>
                                         <PhoneIcon sx={{ fontSize: 48, color: alpha(TEXT_PRIMARY, 0.2), mb: 2 }} />
                                         <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
-                                            {debouncedSearch
-                                                ? 'No phone numbers found matching your search'
+                                            {debouncedSearch || statusFilter !== 'all'
+                                                ? 'No phone numbers found matching your filters'
                                                 : 'No phone numbers found. Add one to get started'}
                                         </Typography>
                                     </Box>
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            phoneNumbers.map((item) => (
-                                <TableRow
-                                    key={item._id}
-                                    hover
-                                    sx={{
-                                        '&:hover': { backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.05 : 0.03) },
-                                        '&:last-child td': { borderBottom: 0 },
-                                        opacity: deleteMutation.isLoading && itemToDelete?._id === item._id ? 0.5 : 1,
-                                    }}
-                                >
-                                    <TableCell sx={{ py: 1.5 }}>
-                                        <Box display="flex" alignItems="center" gap={0.5}>
-                                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace', fontWeight: 500 }}>
-                                                {item.pa_id}
+                            phoneNumbers.map((item) => {
+                                const isRowSelected = selectedRows.includes(item._id);
+                                return (
+                                    <TableRow
+                                        key={item._id}
+                                        hover
+                                        selected={isRowSelected}
+                                        sx={{
+                                            '&:hover': { backgroundColor: alpha(BLUE_COLOR, theme.palette.mode === 'dark' ? 0.05 : 0.03) },
+                                            '&.Mui-selected': { backgroundColor: alpha(BLUE_COLOR, 0.06) },
+                                            '&:last-child td': { borderBottom: 0 },
+                                            opacity: deleteMutation.isLoading && itemToDelete?._id === item._id ? 0.5 : 1,
+                                        }}
+                                    >
+                                        <TableCell padding="checkbox" sx={{ pl: 1.5 }}>
+                                            <Checkbox
+                                                size="small"
+                                                checked={isRowSelected}
+                                                onChange={() => handleSelectRow(item._id)}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Box display="flex" alignItems="center" gap={0.5}>
+                                                <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace', fontWeight: 500 }}>
+                                                    {item.pa_id}
+                                                </Typography>
+                                                <Tooltip title="Copy PA ID">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleCopyPaId(item.pa_id)}
+                                                        sx={{ color: BLUE_COLOR, fontSize: '0.8rem', p: 0.5 }}
+                                                    >
+                                                        <CopyIcon fontSize="inherit" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Chip
+                                                label={item.country_code}
+                                                size="small"
+                                                sx={{ backgroundColor: alpha(BLUE_COLOR, 0.1), color: BLUE_COLOR, fontWeight: 500, fontSize: '0.75rem', height: 24 }}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                {item.number}
                                             </Typography>
-                                            <Tooltip title="Copy PA ID">
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
+                                                {item.browser_reset_time}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Box display="flex" gap={0.5} flexWrap="wrap">
+                                                {item.password_formatters?.map((formatter) => (
+                                                    <Tooltip key={formatter._id} title={formatFormatterLabel(formatter)}>
+                                                        <Chip
+                                                            label={formatFormatterLabel(formatter)}
+                                                            size="small"
+                                                            sx={{
+                                                                backgroundColor: alpha(GREEN_COLOR, 0.1),
+                                                                color: GREEN_COLOR,
+                                                                fontSize: '0.7rem',
+                                                                height: 24,
+                                                                '& .MuiChip-label': { px: 1 }
+                                                            }}
+                                                        />
+                                                    </Tooltip>
+                                                ))}
+                                                {(!item.password_formatters || item.password_formatters.length === 0) && (
+                                                    <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.5), fontStyle: 'italic' }}>
+                                                        No formatters
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </TableCell>
+                                        <TableCell sx={{ py: 1.5 }}>
+                                            <Chip
+                                                label={getStatusLabel(item.is_active)}
+                                                size="small"
+                                                variant="outlined"
+                                                icon={item.is_active
+                                                    ? <CheckCircleIcon sx={{ fontSize: '0.75rem' }} />
+                                                    : <BlockIcon sx={{ fontSize: '0.75rem' }} />
+                                                }
+                                                sx={{
+                                                    fontWeight: 500,
+                                                    fontSize: '0.75rem',
+                                                    height: 24,
+                                                    ...getStatusStyle(item.is_active),
+                                                    '& .MuiChip-label': { px: 1 },
+                                                }}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right" sx={{ py: 1.5 }}>
+                                            <Tooltip title="Edit">
                                                 <IconButton
                                                     size="small"
-                                                    onClick={() => handleCopyPaId(item.pa_id)}
-                                                    sx={{ color: BLUE_COLOR, fontSize: '0.8rem', p: 0.5 }}
+                                                    onClick={() => handleOpenDialog(item)}
+                                                    sx={{ color: BLUE_COLOR, fontSize: '0.9rem', mr: 0.5 }}
+                                                    disabled={updateMutation.isLoading || deleteMutation.isLoading}
                                                 >
-                                                    <CopyIcon fontSize="inherit" />
+                                                    <EditIcon fontSize="inherit" />
                                                 </IconButton>
                                             </Tooltip>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1.5 }}>
-                                        <Chip
-                                            label={item.country_code}
-                                            size="small"
-                                            sx={{ backgroundColor: alpha(BLUE_COLOR, 0.1), color: BLUE_COLOR, fontWeight: 500, fontSize: '0.75rem', height: 24 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1.5 }}>
-                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                            {item.number}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1.5 }}>
-                                        <Typography variant="body2" sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>
-                                            {item.browser_reset_time}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1.5 }}>
-                                        <Box display="flex" gap={0.5} flexWrap="wrap">
-                                            {item.password_formatters?.map((formatter) => (
-                                                <Tooltip
-                                                    key={formatter._id}
-                                                    title={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
+                                            <Tooltip title="Delete">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleDeleteClick(item)}
+                                                    sx={{ color: RED_COLOR, fontSize: '0.9rem' }}
+                                                    disabled={updateMutation.isLoading || deleteMutation.isLoading}
                                                 >
-                                                    <Chip
-                                                        label={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
-                                                        size="small"
-                                                        sx={{
-                                                            backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                                            color: GREEN_COLOR,
-                                                            fontSize: '0.7rem',
-                                                            height: 24,
-                                                            '& .MuiChip-label': { px: 1 }
-                                                        }}
-                                                    />
-                                                </Tooltip>
-                                            ))}
-                                            {(!item.password_formatters || item.password_formatters.length === 0) && (
-                                                <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.5), fontStyle: 'italic' }}>
-                                                    No formatters
-                                                </Typography>
-                                            )}
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell sx={{ py: 1.5 }}>
-                                        <Chip
-                                            label={getStatusLabel(item.is_active)}
-                                            size="small"
-                                            variant="outlined"
-                                            icon={item.is_active ? <CheckCircleIcon sx={{ fontSize: '0.75rem' }} /> : <BlockIcon sx={{ fontSize: '0.75rem' }} />}
-                                            sx={{
-                                                fontWeight: 500,
-                                                fontSize: '0.75rem',
-                                                height: 24,
-                                                ...getStatusStyle(item.is_active),
-                                                '& .MuiChip-label': { px: 1 },
-                                            }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right" sx={{ py: 1.5 }}>
-                                        <Tooltip title="Edit">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleOpenDialog(item)}
-                                                sx={{ color: BLUE_COLOR, fontSize: '0.9rem', mr: 0.5 }}
-                                                disabled={updateMutation.isLoading || deleteMutation.isLoading}
-                                            >
-                                                <EditIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Delete">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleDeleteClick(item)}
-                                                sx={{ color: RED_COLOR, fontSize: '0.9rem' }}
-                                                disabled={updateMutation.isLoading || deleteMutation.isLoading}
-                                            >
-                                                <DeleteIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                                    <DeleteIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
@@ -583,6 +718,7 @@ export const PhoneNumbers = () => {
                 />
             </TableContainer>
 
+            {/* Create / Edit Dialog */}
             <Dialog
                 open={openDialog}
                 onClose={() => { setOpenDialog(false); resetForm(); }}
@@ -636,10 +772,8 @@ export const PhoneNumbers = () => {
                             />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6 }}>
-                            <FormControl fullWidth size='small'>
-                                <InputLabel>
-                                    Password Formatters
-                                </InputLabel>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Password Formatters</InputLabel>
                                 <Select
                                     multiple
                                     value={formData.password_formatter_ids}
@@ -652,26 +786,16 @@ export const PhoneNumbers = () => {
                                                 return formatter ? (
                                                     <Chip
                                                         key={value}
-                                                        label={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
+                                                        label={formatFormatterLabel(formatter)}
                                                         size="small"
-                                                        sx={{
-                                                            backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                                            color: GREEN_COLOR,
-                                                            fontSize: '0.7rem',
-                                                            height: 24,
-                                                        }}
+                                                        sx={{ backgroundColor: alpha(GREEN_COLOR, 0.1), color: GREEN_COLOR, fontSize: '0.7rem', height: 24 }}
                                                     />
                                                 ) : (
                                                     <Chip
                                                         key={value}
                                                         label="Unknown"
                                                         size="small"
-                                                        sx={{
-                                                            backgroundColor: alpha(RED_COLOR, 0.1),
-                                                            color: RED_COLOR,
-                                                            fontSize: '0.7rem',
-                                                            height: 24,
-                                                        }}
+                                                        sx={{ backgroundColor: alpha(RED_COLOR, 0.1), color: RED_COLOR, fontSize: '0.7rem', height: 24 }}
                                                     />
                                                 );
                                             })}
@@ -693,7 +817,6 @@ export const PhoneNumbers = () => {
                                             <ListItemText primary="Select All" />
                                         </MenuItem>
                                     )}
-
                                     {formattersLoading ? (
                                         <MenuItem disabled>
                                             <CircularProgress size={20} sx={{ mr: 1 }} />
@@ -707,7 +830,7 @@ export const PhoneNumbers = () => {
                                                 <MenuItem key={formatterId} value={formatterId} sx={{ fontSize: '0.85rem' }}>
                                                     <Checkbox checked={isSelected} size="small" />
                                                     <ListItemText
-                                                        primary={`${formatter.start_add || ''} → ${formatter.start_index || ''} → ${formatter.end_index || ''} → ${formatter.end_add || ''}`}
+                                                        primary={formatFormatterLabel(formatter)}
                                                         primaryTypographyProps={{ fontSize: '0.85rem' }}
                                                     />
                                                 </MenuItem>
@@ -717,6 +840,52 @@ export const PhoneNumbers = () => {
                                 </Select>
                             </FormControl>
                         </Grid>
+
+                        {/* Active toggle — only shown when editing */}
+                        {selectedNumber && (
+                            <Grid size={{ xs: 12 }}>
+                                <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    justifyContent="space-between"
+                                    sx={{
+                                        border: `1px solid ${theme.palette.divider}`,
+                                        borderRadius: 1,
+                                        px: 2,
+                                        py: 1.2,
+                                    }}
+                                >
+                                    <Box>
+                                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 500, color: TEXT_PRIMARY }}>
+                                            Active Status
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.6) }}>
+                                            Toggle whether this phone number is active
+                                        </Typography>
+                                    </Box>
+                                    <Chip
+                                        label={formData.is_active ? 'Active' : 'Inactive'}
+                                        size="small"
+                                        variant="outlined"
+                                        icon={formData.is_active
+                                            ? <CheckCircleIcon sx={{ fontSize: '0.75rem' }} />
+                                            : <BlockIcon sx={{ fontSize: '0.75rem' }} />
+                                        }
+                                        onClick={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                                        sx={{
+                                            cursor: 'pointer',
+                                            fontWeight: 500,
+                                            fontSize: '0.75rem',
+                                            height: 28,
+                                            ...getStatusStyle(formData.is_active),
+                                            '& .MuiChip-label': { px: 1 },
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': { opacity: 0.85 }
+                                        }}
+                                    />
+                                </Box>
+                            </Grid>
+                        )}
                     </Grid>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
@@ -744,6 +913,7 @@ export const PhoneNumbers = () => {
                 </DialogActions>
             </Dialog>
 
+            {/* Single Delete Dialog */}
             <Dialog
                 open={openDeleteDialog}
                 onClose={() => setOpenDeleteDialog(false)}
@@ -752,11 +922,7 @@ export const PhoneNumbers = () => {
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
                 <DialogTitle sx={{
-                    color: RED_COLOR,
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                    py: 2,
-                    px: 3,
+                    color: RED_COLOR, fontWeight: 600, fontSize: '1rem', py: 2, px: 3,
                     borderBottom: `1px solid ${theme.palette.divider}`
                 }}>
                     <Box display="flex" alignItems="center" gap={1}>
@@ -772,29 +938,19 @@ export const PhoneNumbers = () => {
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
-                    <OutlineButton
-                        onClick={() => setOpenDeleteDialog(false)}
-                        size="medium"
-                        sx={{ fontSize: '0.85rem', px: 2 }}
-                        disabled={deleteMutation.isLoading}
-                    >
+                    <OutlineButton onClick={() => setOpenDeleteDialog(false)} size="medium" sx={{ fontSize: '0.85rem', px: 2 }} disabled={deleteMutation.isLoading}>
                         Cancel
                     </OutlineButton>
                     <Button
                         variant="contained"
                         sx={{
                             background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
-                            color: 'white',
-                            borderRadius: 1,
-                            padding: '6px 16px',
-                            fontWeight: 500,
-                            fontSize: '0.85rem',
-                            textTransform: 'none',
+                            color: 'white', borderRadius: 1, padding: '6px 16px', fontWeight: 500,
+                            fontSize: '0.85rem', textTransform: 'none',
                             '&:hover': { background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)` },
                         }}
                         onClick={handleDeleteConfirm}
                         startIcon={deleteMutation.isLoading ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <DeleteIcon sx={{ fontSize: '0.9rem' }} />}
-                        size="medium"
                         disabled={deleteMutation.isLoading}
                     >
                         {deleteMutation.isLoading ? 'Deleting...' : 'Delete'}
@@ -802,52 +958,73 @@ export const PhoneNumbers = () => {
                 </DialogActions>
             </Dialog>
 
-            <Snackbar
-                open={!!success}
-                autoHideDuration={3000}
-                onClose={() => setSuccess('')}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            {/* Bulk Delete Dialog */}
+            <Dialog
+                open={openBulkDeleteDialog}
+                onClose={() => setOpenBulkDeleteDialog(false)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{ sx: { borderRadius: 2 } }}
             >
-                <Alert
-                    severity="success"
-                    sx={{
-                        width: '100%',
-                        borderRadius: 1,
-                        backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
-                        borderLeft: `3px solid ${GREEN_COLOR}`,
-                        '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '1rem' },
-                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
-                        color: TEXT_PRIMARY,
-                        py: 0.5,
-                        px: 2,
-                    }}
-                    elevation={4}
-                >
+                <DialogTitle sx={{
+                    color: RED_COLOR, fontWeight: 600, fontSize: '1rem', py: 2, px: 3,
+                    borderBottom: `1px solid ${theme.palette.divider}`
+                }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <DeleteSweepIcon sx={{ fontSize: '1.1rem' }} />
+                        Confirm Bulk Delete
+                    </Box>
+                </DialogTitle>
+                <DialogContent sx={{ px: 3, py: 2 }}>
+                    <DialogContentText sx={{ fontSize: '0.9rem', color: TEXT_PRIMARY }}>
+                        Are you sure you want to delete{' '}
+                        <strong>{selectedRows.length} phone number{selectedRows.length > 1 ? 's' : ''}</strong>?
+                        This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+                    <OutlineButton onClick={() => setOpenBulkDeleteDialog(false)} size="medium" sx={{ fontSize: '0.85rem', px: 2 }} disabled={bulkDeleting}>
+                        Cancel
+                    </OutlineButton>
+                    <Button
+                        variant="contained"
+                        sx={{
+                            background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
+                            color: 'white', borderRadius: 1, padding: '6px 16px', fontWeight: 500,
+                            fontSize: '0.85rem', textTransform: 'none',
+                            '&:hover': { background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)` },
+                        }}
+                        onClick={handleBulkDelete}
+                        startIcon={bulkDeleting ? <CircularProgress size={18} sx={{ color: 'white' }} /> : <DeleteSweepIcon sx={{ fontSize: '0.9rem' }} />}
+                        disabled={bulkDeleting}
+                    >
+                        {bulkDeleting ? 'Deleting...' : `Delete ${selectedRows.length}`}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar open={!!success} autoHideDuration={3000} onClose={() => setSuccess('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+                <Alert severity="success" sx={{
+                    width: '100%', borderRadius: 1,
+                    backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                    borderLeft: `3px solid ${GREEN_COLOR}`,
+                    '& .MuiAlert-icon': { color: GREEN_COLOR, fontSize: '1rem' },
+                    '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
+                    color: TEXT_PRIMARY, py: 0.5, px: 2,
+                }} elevation={4}>
                     <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{success}</Typography>
                 </Alert>
             </Snackbar>
 
-            <Snackbar
-                open={!!error}
-                autoHideDuration={3000}
-                onClose={() => setError('')}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-                <Alert
-                    severity="error"
-                    sx={{
-                        width: '100%',
-                        borderRadius: 1,
-                        backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
-                        borderLeft: `3px solid ${RED_COLOR}`,
-                        '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '1rem' },
-                        '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
-                        color: TEXT_PRIMARY,
-                        py: 0.5,
-                        px: 2,
-                    }}
-                    elevation={4}
-                >
+            <Snackbar open={!!error} autoHideDuration={3000} onClose={() => setError('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+                <Alert severity="error" sx={{
+                    width: '100%', borderRadius: 1,
+                    backgroundColor: alpha(RED_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                    borderLeft: `3px solid ${RED_COLOR}`,
+                    '& .MuiAlert-icon': { color: RED_COLOR, fontSize: '1rem' },
+                    '& .MuiAlert-message': { fontSize: '0.85rem', py: 0.5 },
+                    color: TEXT_PRIMARY, py: 0.5, px: 2,
+                }} elevation={4}>
                     <Typography fontWeight={500} sx={{ fontSize: '0.85rem', color: TEXT_PRIMARY }}>{error}</Typography>
                 </Alert>
             </Snackbar>
