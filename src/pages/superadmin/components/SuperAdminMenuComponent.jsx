@@ -30,14 +30,14 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
             sectionName: 'System & Configuration',
             items: [
                 {
-                    text: 'Phone Numbers',
-                    icon: <PhoneIcon />,
-                    path: '/superadmin-dashboard/phone-numbers'
-                },
-                {
                     text: 'Password Formatters',
                     icon: <PasswordFormatterIcon />,
                     path: '/superadmin-dashboard/password-formatters'
+                },
+                {
+                    text: 'Phone Numbers',
+                    icon: <PhoneIcon />,
+                    path: '/superadmin-dashboard/phone-numbers'
                 },
                 {
                     text: 'Valid Phone & Password',
