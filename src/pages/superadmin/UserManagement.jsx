@@ -294,14 +294,6 @@ export const UserManagement = () => {
 
     const isCurrentUser = (userId) => currentUser?.id === userId;
 
-    if (isLoading) {
-        return (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress sx={{ color: BLUE_COLOR }} />
-            </Box>
-        );
-    }
-
     return (
         <Box>
             <Helmet>
@@ -348,16 +340,26 @@ export const UserManagement = () => {
             </Box>
 
             <TableContainer
-                component={Paper}
-                elevation={0}
+                component={Paper} elevation={0}
                 sx={{
-                    borderRadius: 1.5,
-                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 2, border: `1px solid ${theme.palette.divider}`,
                     backgroundColor: theme.palette.background.paper,
-                    overflow: 'auto',
-                    minHeight: 400,
+                    overflow: 'auto', mb: 3, position: 'relative', minHeight: 380,
                 }}
             >
+                {isLoading && (
+                    <Box
+                        position="absolute"
+                        top={0} left={0} right={0} bottom={0}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        bgcolor="rgba(255, 255, 255, 0.7)"
+                        zIndex={1}
+                    >
+                        <CircularProgress />
+                    </Box>
+                )}
                 <Table size="medium">
                     <TableHead>
                         <TableRow sx={{

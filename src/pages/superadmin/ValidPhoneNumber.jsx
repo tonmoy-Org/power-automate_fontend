@@ -36,8 +36,6 @@ import { Helmet } from 'react-helmet-async';
 
 const CARDS_PER_PAGE = 9;
 
-// ─── API helpers ─────────────────────────────────────────────────────────────
-
 const fetchPhoneCredentials = async () => {
     const response = await axiosInstance.get('/phone-credentials', {
         headers: { 'Cache-Control': 'no-cache' },
@@ -51,13 +49,11 @@ const deleteCredentialsByIds = async (ids) => {
     await Promise.all(ids.map((id) => axiosInstance.delete(`/phone-credentials/${id}`)));
 };
 
-// ─── Utility helpers ──────────────────────────────────────────────────────────
-
-const groupByPaId = (credentials) =>
+const groupByCountryCode = (credentials) =>
     credentials.reduce((groups, credential) => {
-        const paId = credential.pa_id;
-        if (!groups[paId]) groups[paId] = [];
-        groups[paId].push(credential);
+        const countryCode = credential.country_code;
+        if (!groups[countryCode]) groups[countryCode] = [];
+        groups[countryCode].push(credential);
         return groups;
     }, {});
 
@@ -88,8 +84,6 @@ const generateAllContent = (credentials, types) =>
         .filter(Boolean)
         .join('\n\n');
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function ValidPhoneNumber() {
     const theme = useTheme();
     const queryClient = useQueryClient();
@@ -109,8 +103,6 @@ export default function ValidPhoneNumber() {
     const [page, setPage] = useState(1);
     const [deleteTarget, setDeleteTarget] = useState(null);
 
-    // ── Queries & Mutations ──────────────────────────────────────────────────
-
     const {
         data: credentials = [],
         isLoading,
@@ -126,7 +118,7 @@ export default function ValidPhoneNumber() {
         mutationFn: deleteCredentialsByIds,
         onSuccess: () => {
             queryClient.invalidateQueries(['phoneCredentials']);
-            setSuccess(`All credentials for ${deleteTarget?.paId} deleted successfully`);
+            setSuccess(`All credentials for ${deleteTarget?.countryCode} deleted successfully`);
             setDeleteTarget(null);
         },
         onError: (err) => {
@@ -134,8 +126,6 @@ export default function ValidPhoneNumber() {
             setDeleteTarget(null);
         },
     });
-
-    // ── Derived data ─────────────────────────────────────────────────────────
 
     const uniqueTypes = useMemo(() => {
         if (!credentials.length) return ['A', 'B', 'C'];
@@ -157,12 +147,12 @@ export default function ValidPhoneNumber() {
             const query = searchQuery.toLowerCase();
             filtered = credentials.filter(
                 (cred) =>
-                    cred.pa_id?.toLowerCase().includes(query) ||
+                    cred.country_code?.toLowerCase().includes(query) ||
                     cred.phone?.toLowerCase().includes(query) ||
                     cred.type?.toLowerCase().includes(query)
             );
         }
-        return groupByPaId(filtered);
+        return groupByCountryCode(filtered);
     }, [credentials, searchQuery]);
 
     const allEntries = Object.entries(filteredAndGroupedCredentials);
@@ -172,29 +162,13 @@ export default function ValidPhoneNumber() {
         page * CARDS_PER_PAGE
     );
 
-    // ── Color helpers ─────────────────────────────────────────────────────────
-
-    const getTypeColor = (type, hasType) => {
+    const getTypeColor = (hasType) => {
         if (!hasType) return GREY_COLOR;
-        switch (type) {
-            case 'A': return GREEN_COLOR;
-            case 'B': return BLUE_COLOR;
-            case 'C': return WARNING_COLOR;
-            default: return BLUE_COLOR;
-        }
+        return BLUE_COLOR;
     };
 
-    const getTypeBackground = (type, hasType) => {
-        const c = getTypeColor(type, hasType);
-        return alpha(c, 0.1);
-    };
-
-    const getTypeBorder = (type, hasType) => {
-        const c = getTypeColor(type, hasType);
-        return alpha(c, 0.25);
-    };
-
-    // ── Event handlers ────────────────────────────────────────────────────────
+    const getTypeBackground = (hasType) => alpha(getTypeColor(hasType), 0.1);
+    const getTypeBorder = (hasType) => alpha(getTypeColor(hasType), 0.25);
 
     const handlePageChange = (_, value) => {
         setPage(value);
@@ -206,25 +180,25 @@ export default function ValidPhoneNumber() {
         setPage(1);
     };
 
-    const handleDownload = (paCredentials, type) => {
+    const handleDownload = (countryCredentials, type) => {
         try {
-            const content = generateTypeContent(paCredentials, type);
+            const content = generateTypeContent(countryCredentials, type);
             if (!content) { setError(`No Type ${type} credentials to download`); return; }
-            const paId = paCredentials[0]?.pa_id || 'unknown';
-            downloadTxtFile(content, `${paId}_type_${type}.txt`);
-            setSuccess(`Downloaded Type ${type} credentials for PA ID: ${paId}`);
+            const countryCode = countryCredentials[0]?.country_code || 'unknown';
+            downloadTxtFile(content, `${countryCode}_type_${type}.txt`);
+            setSuccess(`Downloaded Type ${type} credentials for Country Code: ${countryCode}`);
         } catch {
             setError('Failed to download file');
         }
     };
 
-    const handleDownloadAll = (paCredentials) => {
+    const handleDownloadAll = (countryCredentials) => {
         try {
-            const paId = paCredentials[0]?.pa_id || 'unknown';
-            const content = generateAllContent(paCredentials, uniqueTypes);
+            const countryCode = countryCredentials[0]?.country_code || 'unknown';
+            const content = generateAllContent(countryCredentials, uniqueTypes);
             if (!content) { setError('No credentials to download'); return; }
-            downloadTxtFile(content, `${paId}_all_credentials.txt`);
-            setSuccess(`Downloaded all credentials for PA ID: ${paId}`);
+            downloadTxtFile(content, `${countryCode}_all_credentials.txt`);
+            setSuccess(`Downloaded all credentials for Country Code: ${countryCode}`);
         } catch {
             setError('Failed to download file');
         }
@@ -252,16 +226,14 @@ export default function ValidPhoneNumber() {
         }
     };
 
-    const handleDeleteCard = (paId, paCredentials) => {
-        const ids = paCredentials.map((c) => c._id);
-        setDeleteTarget({ paId, ids, count: ids.length });
+    const handleDeleteCard = (countryCode, countryCredentials) => {
+        const ids = countryCredentials.map((c) => c._id);
+        setDeleteTarget({ countryCode, ids, count: ids.length });
     };
 
     const handleDeleteConfirm = () => {
         if (deleteTarget) deleteMutation.mutate(deleteTarget.ids);
     };
-
-    // ── Loading / Error states ────────────────────────────────────────────────
 
     if (isLoading) {
         return (
@@ -283,15 +255,12 @@ export default function ValidPhoneNumber() {
 
     const hasData = paginatedEntries.length > 0;
 
-    // ── Render ────────────────────────────────────────────────────────────────
-
     return (
         <Box>
             <Helmet>
                 <title>Valid Phone & Password | Power Automate</title>
             </Helmet>
 
-            {/* ── Header ── */}
             <Box sx={{ mb: 3 }}>
                 <Typography
                     sx={{
@@ -306,14 +275,13 @@ export default function ValidPhoneNumber() {
                     Valid Phone & Password
                 </Typography>
                 <Typography variant="caption" sx={{ fontSize: '0.75rem', color: alpha(TEXT_PRIMARY, 0.6) }}>
-                    Manage and download phone credentials grouped by PA ID
+                    Manage and download phone credentials grouped by Country Code
                 </Typography>
             </Box>
 
-            {/* ── Search ── */}
             <Box mb={2.5}>
                 <StyledTextField
-                    placeholder="Search by PA ID, phone, or type…"
+                    placeholder="Search by Country Code, phone, or type…"
                     value={searchQuery}
                     onChange={handleSearch}
                     size="small"
@@ -321,13 +289,13 @@ export default function ValidPhoneNumber() {
                     sx={{ '& .MuiInputBase-input': { fontSize: '0.85rem', color: TEXT_PRIMARY } }}
                 />
             </Box>
-            {/* ── Type Summary Cards ── */}
+
             {credentials.length > 0 && (
                 <Grid container spacing={1.5} sx={{ mb: 3 }}>
                     {typeSummary.map(({ type, count }) => {
-                        const color = getTypeColor(type, count > 0);
-                        const bg = getTypeBackground(type, count > 0);
-                        const border = getTypeBorder(type, count > 0);
+                        const color = getTypeColor(count > 0);
+                        const bg = getTypeBackground(count > 0);
+                        const border = getTypeBorder(count > 0);
 
                         return (
                             <Grid item xs="auto" key={type}>
@@ -344,7 +312,6 @@ export default function ValidPhoneNumber() {
                                 >
                                     <CardContent sx={{ py: 1.25, px: 2, '&:last-child': { pb: 1.25 } }}>
                                         <Box display="flex" alignItems="center" justifyContent="space-between" gap={1.5}>
-                                            {/* Label + count */}
                                             <Box display="flex" alignItems="center" gap={1}>
                                                 <Chip
                                                     label={type}
@@ -366,7 +333,6 @@ export default function ValidPhoneNumber() {
                                                 </Typography>
                                             </Box>
 
-                                            {/* Download button */}
                                             <Tooltip title={`Download all Type ${type}`}>
                                                 <span>
                                                     <IconButton
@@ -392,7 +358,6 @@ export default function ValidPhoneNumber() {
                 </Grid>
             )}
 
-            {/* ── Second All Valid Phone & Password Tile ── */}
             {credentials.length > 0 && (
                 <Box sx={{ mb: 3 }}>
                     <Card
@@ -403,60 +368,57 @@ export default function ValidPhoneNumber() {
                             borderRadius: 2,
                         }}
                     >
-                        <CardContent sx={{ py: 2, px: 2.5 }}>
-                            <Box display="flex" alignItems="center" justifyContent="space-between">
-                                <Box display="flex" alignItems="center" gap={1.5}>
-                                    <Typography
-                                        variant="subtitle2"
-                                        sx={{
-                                            fontWeight: 600,
-                                            color: WARNING_COLOR,
-                                            fontSize: '0.85rem',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.02em',
-                                        }}
-                                    >
-                                        All Valid Phone & Password
+                        <Box sx={{ p: 2 }} display="flex" alignItems="center" justifyContent="space-between">
+                            <Box display="flex" alignItems="center" gap={1.5}>
+                                <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                        fontWeight: 600,
+                                        color: WARNING_COLOR,
+                                        fontSize: '0.85rem',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.02em',
+                                    }}
+                                >
+                                    All Valid Phone & Password
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                        backgroundColor: alpha(WARNING_COLOR, 0.1),
+                                        borderRadius: 1.5,
+                                        px: 1,
+                                        py: 0.25,
+                                    }}
+                                >
+                                    <Typography variant="caption" sx={{ color: alpha(TEXT_PRIMARY, 0.7) }}>
+                                        Total:
                                     </Typography>
-                                    <Box
-                                        sx={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 0.5,
-                                            backgroundColor: alpha(WARNING_COLOR, 0.1),
-                                            borderRadius: 1.5,
-                                            px: 1,
-                                            py: 0.25,
-                                        }}
-                                    >
-                                        <Typography variant="caption" sx={{ color: alpha(TEXT_PRIMARY, 0.7) }}>
-                                            Total:
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ fontWeight: 700, color: WARNING_COLOR }}>
-                                            {credentials.length}
-                                        </Typography>
-                                    </Box>
+                                    <Typography variant="caption" sx={{ fontWeight: 700, color: WARNING_COLOR }}>
+                                        {credentials.length}
+                                    </Typography>
                                 </Box>
-                                <Tooltip title="Download all credentials">
-                                    <IconButton
-                                        size="small"
-                                        onClick={handleDownloadAllCredentials}
-                                        sx={{
-                                            color: WARNING_COLOR,
-                                            backgroundColor: alpha(WARNING_COLOR, 0.1),
-                                            '&:hover': { backgroundColor: alpha(WARNING_COLOR, 0.2) },
-                                        }}
-                                    >
-                                        <DownloadAllIcon sx={{ fontSize: 20 }} />
-                                    </IconButton>
-                                </Tooltip>
                             </Box>
-                        </CardContent>
+                            <Tooltip title="Download all credentials">
+                                <IconButton
+                                    size="small"
+                                    onClick={handleDownloadAllCredentials}
+                                    sx={{
+                                        color: WARNING_COLOR,
+                                        backgroundColor: alpha(WARNING_COLOR, 0.1),
+                                        '&:hover': { backgroundColor: alpha(WARNING_COLOR, 0.2) },
+                                    }}
+                                >
+                                    <DownloadAllIcon sx={{ fontSize: 20 }} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
                     </Card>
                 </Box>
             )}
 
-            {/* ── Main Grid ── */}
             {!hasData ? (
                 <Alert severity="info" sx={{ fontSize: '0.85rem' }}>
                     {searchQuery
@@ -466,12 +428,12 @@ export default function ValidPhoneNumber() {
             ) : (
                 <>
                     <Grid container spacing={2.5}>
-                        {paginatedEntries.map(([paId, paCredentials]) => {
+                        {paginatedEntries.map(([countryCode, countryCredentials]) => {
                             const isDeleting =
-                                deleteMutation.isLoading && deleteTarget?.paId === paId;
+                                deleteMutation.isLoading && deleteTarget?.countryCode === countryCode;
 
                             return (
-                                <Grid item xs={12} sm={6} md={6} key={paId}>
+                                <Grid item xs={12} sm={6} md={6} key={countryCode}>
                                     <Card
                                         elevation={0}
                                         sx={{
@@ -493,15 +455,15 @@ export default function ValidPhoneNumber() {
                                                     fontWeight={700}
                                                     sx={{ fontSize: '0.9rem', letterSpacing: '0.01em' }}
                                                 >
-                                                    ID: {paId}
+                                                    Country Code: {countryCode}
                                                 </Typography>
                                             }
                                             action={
-                                                <Box display="flex" alignItems="center" gap={0.5} pr={0.5} pt={0.5}>
+                                                <Box display="flex" alignItems="center" sx={{ ml: 5 }}>
                                                     <Tooltip title="Download all credentials">
                                                         <IconButton
                                                             size="small"
-                                                            onClick={() => handleDownloadAll(paCredentials)}
+                                                            onClick={() => handleDownloadAll(countryCredentials)}
                                                             sx={{
                                                                 color: WARNING_COLOR,
                                                                 p: 0.75,
@@ -511,10 +473,10 @@ export default function ValidPhoneNumber() {
                                                             <DownloadAllIcon sx={{ fontSize: 18 }} />
                                                         </IconButton>
                                                     </Tooltip>
-                                                    <Tooltip title="Delete all credentials for this PA">
+                                                    <Tooltip title="Delete all credentials for this Country Code">
                                                         <IconButton
                                                             size="small"
-                                                            onClick={() => handleDeleteCard(paId, paCredentials)}
+                                                            onClick={() => handleDeleteCard(countryCode, countryCredentials)}
                                                             disabled={deleteMutation.isLoading}
                                                             sx={{
                                                                 color: RED_COLOR,
@@ -537,15 +499,15 @@ export default function ValidPhoneNumber() {
                                         <CardContent sx={{ pt: 0.5, px: 2, pb: 1.5 }}>
                                             {uniqueTypes
                                                 .filter((type) =>
-                                                    paCredentials.some((cred) => cred.type === type)
+                                                    countryCredentials.some((cred) => cred.type === type)
                                                 )
                                                 .map((type, index, arr) => {
-                                                    const typeCredentials = paCredentials.filter(
+                                                    const typeCredentials = countryCredentials.filter(
                                                         (cred) => cred.type === type
                                                     );
-                                                    const typeColor = getTypeColor(type, true);
-                                                    const typeBg = getTypeBackground(type, true);
-                                                    const typeBorder = getTypeBorder(type, true);
+                                                    const typeColor = getTypeColor(true);
+                                                    const typeBg = getTypeBackground(true);
+                                                    const typeBorder = getTypeBorder(true);
                                                     const typeCount = typeCredentials.length;
 
                                                     return (
@@ -601,7 +563,7 @@ export default function ValidPhoneNumber() {
                                                                 <Tooltip title={`Download Type ${type}`}>
                                                                     <IconButton
                                                                         size="small"
-                                                                        onClick={() => handleDownload(paCredentials, type)}
+                                                                        onClick={() => handleDownload(countryCredentials, type)}
                                                                         sx={{
                                                                             color: typeColor,
                                                                             p: 0.5,
@@ -626,7 +588,6 @@ export default function ValidPhoneNumber() {
                         })}
                     </Grid>
 
-                    {/* Pagination */}
                     {totalPages > 1 && (
                         <Box display="flex" justifyContent="center" mt={4}>
                             <Pagination
@@ -646,13 +607,12 @@ export default function ValidPhoneNumber() {
                         <Typography variant="caption" sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.55) }}>
                             Showing {(page - 1) * CARDS_PER_PAGE + 1}–
                             {Math.min(page * CARDS_PER_PAGE, allEntries.length)} of{' '}
-                            {allEntries.length} PA ID{allEntries.length !== 1 ? 's' : ''}
+                            {allEntries.length} Country Code{allEntries.length !== 1 ? 's' : ''}
                         </Typography>
                     </Box>
                 </>
             )}
 
-            {/* ── Delete Confirmation Dialog ── */}
             <Dialog
                 open={!!deleteTarget}
                 onClose={() => !deleteMutation.isLoading && setDeleteTarget(null)}
@@ -682,7 +642,7 @@ export default function ValidPhoneNumber() {
                             {deleteTarget?.count} credential
                             {deleteTarget?.count !== 1 ? 's' : ''}
                         </strong>{' '}
-                        for <strong>{deleteTarget?.paId}</strong>? This action cannot be undone.
+                        for <strong>Country Code {deleteTarget?.countryCode}</strong>? This action cannot be undone.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}`, gap: 1 }}>
@@ -723,7 +683,6 @@ export default function ValidPhoneNumber() {
                 </DialogActions>
             </Dialog>
 
-            {/* ── Success Snackbar ── */}
             <Snackbar
                 open={!!success}
                 autoHideDuration={3000}
@@ -751,7 +710,6 @@ export default function ValidPhoneNumber() {
                 </Alert>
             </Snackbar>
 
-            {/* ── Error Snackbar ── */}
             <Snackbar
                 open={!!error}
                 autoHideDuration={3000}
