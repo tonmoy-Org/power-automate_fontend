@@ -118,7 +118,7 @@ export const SuperAdminDashboard = () => {
 
   const glassCardSx = (color) => ({
     p: 2.5,
-    height: 'auto',
+    height: '100%', // Changed from 'auto' to '100%' to ensure all cards have same height
     minHeight: 160,
     display: 'flex',
     flexDirection: 'column',
@@ -185,7 +185,7 @@ export const SuperAdminDashboard = () => {
               <Typography variant="h3" component="div" color="primary.main" sx={{ fontWeight: 700, fontSize: '2rem', lineHeight: 1.2 }}>
                 {counts.phoneNumbers.toLocaleString()}
               </Typography>
-              <Box display="flex" flexDirection="column" gap={0.4} alignItems="flex-end">
+              <Box display="flex" flexDirection="column" gap={0} alignItems="flex-end">
                 <Box sx={statusItemSx}>
                   <BlockIcon sx={{ fontSize: '0.75rem', color: INACTIVE_COLOR }} />
                   <Typography sx={{ fontSize: '0.72rem', fontWeight: 500, color: INACTIVE_COLOR }}>
@@ -219,7 +219,7 @@ export const SuperAdminDashboard = () => {
                 Active password formatting rules
               </Typography>
             </Box>
-            <Box sx={{ mt: 'auto' }}>
+            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', height: '100%' }}>
               <Typography variant="h3" component="div" color="success.main" sx={{ fontWeight: 700, fontSize: '2rem', lineHeight: 1.2 }}>
                 {counts.passwordFormatters.toLocaleString()}
               </Typography>
@@ -237,7 +237,7 @@ export const SuperAdminDashboard = () => {
                 Valid phone and password combinations
               </Typography>
             </Box>
-            <Box sx={{ mt: 'auto' }}>
+            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', height: '100%' }}>
               <Typography variant="h3" component="div" color="warning.main" sx={{ fontWeight: 700, fontSize: '2rem', lineHeight: 1.2 }}>
                 {counts.phoneCredentials.toLocaleString()}
               </Typography>
@@ -267,6 +267,7 @@ export const SuperAdminDashboard = () => {
                       borderRadius: 2,
                       background: bg,
                       transition: 'box-shadow 0.2s',
+                      height: '100%', // Ensure all type cards have same height
                       '&:hover': { boxShadow: `0 4px 12px ${alpha(color, 0.2)}` },
                     }}
                   >
