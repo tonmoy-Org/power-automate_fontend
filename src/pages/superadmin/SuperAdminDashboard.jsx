@@ -92,7 +92,6 @@ export const SuperAdminDashboard = () => {
   const getTypeBackground = (hasType) => alpha(getTypeColor(hasType), 0.1);
   const getTypeBorder = (hasType) => alpha(getTypeColor(hasType), 0.25);
 
-  // Downloads plain phone:password lines — no headers or comments
   const handleDownloadTypeAll = (type) => {
     try {
       const typeCredentials = credentials.filter((cred) => cred.type === type);
