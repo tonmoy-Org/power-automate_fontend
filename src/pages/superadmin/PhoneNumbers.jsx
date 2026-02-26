@@ -51,47 +51,34 @@ import {
     KeyboardArrowUp as KeyboardArrowUpIcon,
     ExpandMore as ExpandMoreIcon,
     Warning as WarningIcon,
-    ToggleOn as ToggleOnIcon,
-    ToggleOff as ToggleOffIcon,
+    PlayArrow as PlayArrowIcon,
+    Pause as PauseIcon,
+    Done as DoneIcon,
 } from '@mui/icons-material';
 import GradientButton from '../../components/ui/GradientButton';
 import OutlineButton from '../../components/ui/OutlineButton';
 import StyledTextField from '../../components/ui/StyledTextField';
-import axiosInstance from '../../api/axios';
+import {
+    fetchPhoneNumbers,
+    fetchPasswordFormatters,
+    createPhoneNumber,
+    bulkCreatePhoneNumbers,
+    updatePhoneNumber,
+    deletePhoneNumber,
+    bulkDeletePhoneNumbers,
+    bulkUpdatePhoneNumberStatus
+} from '../../api/phoneNumbers';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 
-const MAX_NUMBERS_PER_UPLOAD = 100;
+const MAX_NUMBERS_PER_UPLOAD = 1000;
 const INNER_PAGE_SIZE = 50;
 
-// ─── API ──────────────────────────────────────────────────────────────────────
-const fetchPhoneNumbers = async ({ queryKey }) => {
-    const [, , , search] = queryKey;
-    const params = new URLSearchParams({ page: 1, limit: 9999, search: search || '' });
-    const { data } = await axiosInstance.get(`/phone-numbers?${params}`);
-    return data;
-};
-const fetchPasswordFormatters = async () => {
-    const { data } = await axiosInstance.get('/password-formatters/list');
-    return data;
-};
-const createPhoneNumber = async (data) => {
-    const { data: res } = await axiosInstance.post('/phone-numbers', data);
-    return res;
-};
-const updatePhoneNumber = async ({ id, data }) => {
-    const { data: res } = await axiosInstance.put(`/phone-numbers/${id}`, data);
-    return res;
-};
-const deletePhoneNumber = async (id) => {
-    const { data } = await axiosInstance.delete(`/phone-numbers/${id}`);
-    return data;
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const initialFormData = {
-    country_code: '', numbers: '', browser_reset_time: '',
-    password_formatter_ids: [], is_active: false,
+    country_code: '',
+    numbers: '',
+    password_formatter_ids: [],
+    is_active: 'inactive',
 };
 
 const matchFormatterToMaster = (embedded, masters) =>
@@ -117,23 +104,62 @@ const groupByCountryCode = (items) => {
 
 const cellSx = { fontSize: '0.82rem', py: 1.2 };
 
-// ─── ConfirmDialog ────────────────────────────────────────────────────────────
-function ConfirmDialog({ open, onClose, onConfirm, loading, title, titleColor, icon: Icon, message, confirmLabel, confirmColor, confirmColorDark }) {
+const STATUS_ENUM = ['inactive', 'running', 'completed'];
+const STATUS_COLORS = {
+    inactive: { color: '#6B7280', icon: BlockIcon, label: 'Inactive' },
+    running: { color: '#3B82F6', icon: PlayArrowIcon, label: 'Running' },
+    completed: { color: '#10B981', icon: DoneIcon, label: 'Completed' },
+};
+
+const getStatusStyle = (status) => ({
+    backgroundColor: alpha(STATUS_COLORS[status].color, 0.1),
+    color: STATUS_COLORS[status].color,
+    borderColor: STATUS_COLORS[status].color,
+});
+
+const getStatusLabel = (status) => STATUS_COLORS[status].label;
+const getStatusIcon = (status) => STATUS_COLORS[status].icon;
+
+function ConfirmDialog({ open, onClose, onConfirm, loading, title, titleColor, iconComponent, message, confirmLabel, confirmColor, confirmColorDark }) {
     const theme = useTheme();
     const TEXT = theme.palette.text.primary;
+    
+    // Handle iconComponent - it should be the constructor
+    const IconComponent = iconComponent || DeleteIcon;
+    
     return (
         <Dialog open={open} onClose={!loading ? onClose : undefined} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
             <DialogTitle sx={{ color: titleColor, fontWeight: 600, fontSize: '0.95rem', py: 2, px: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
-                <Box display="flex" alignItems="center" gap={1}><Icon sx={{ fontSize: '1.1rem' }} />{title}</Box>
+                <Box display="flex" alignItems="center" gap={1}>
+                    <IconComponent sx={{ fontSize: '1.1rem' }} />
+                    {title}
+                </Box>
             </DialogTitle>
             <DialogContent sx={{ px: 3, py: 2.5 }}>
-                <DialogContentText sx={{ fontSize: '0.875rem', color: TEXT, lineHeight: 1.6 }}>{message}</DialogContentText>
+                <DialogContentText sx={{ fontSize: '0.875rem', color: TEXT, lineHeight: 1.6 }}>
+                    {message}
+                </DialogContentText>
             </DialogContent>
             <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}`, gap: 1 }}>
-                <OutlineButton onClick={onClose} size="medium" sx={{ fontSize: '0.82rem', px: 2 }} disabled={loading}>Cancel</OutlineButton>
-                <Button variant="contained" onClick={onConfirm} disabled={loading}
-                    startIcon={loading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <Icon sx={{ fontSize: '0.9rem' }} />}
-                    sx={{ background: `linear-gradient(135deg, ${confirmColorDark} 0%, ${confirmColor} 100%)`, color: 'white', borderRadius: '8px', px: 2, fontWeight: 500, fontSize: '0.82rem', textTransform: 'none', '&:hover': { filter: 'brightness(1.1)' }, '&.Mui-disabled': { opacity: 0.65, color: 'white' } }}>
+                <OutlineButton onClick={onClose} size="medium" sx={{ fontSize: '0.82rem', px: 2 }} disabled={loading}>
+                    Cancel
+                </OutlineButton>
+                <Button 
+                    variant="contained" 
+                    onClick={onConfirm} 
+                    disabled={loading}
+                    startIcon={loading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <IconComponent sx={{ fontSize: '0.9rem' }} />}
+                    sx={{ 
+                        background: `linear-gradient(135deg, ${confirmColorDark} 0%, ${confirmColor} 100%)`, 
+                        color: 'white', 
+                        borderRadius: '8px', 
+                        px: 2, 
+                        fontWeight: 500, 
+                        fontSize: '0.82rem', 
+                        textTransform: 'none', 
+                        '&:hover': { filter: 'brightness(1.1)' }, 
+                        '&.Mui-disabled': { opacity: 0.65, color: 'white' } 
+                    }}>
                     {loading ? 'Processing…' : confirmLabel}
                 </Button>
             </DialogActions>
@@ -141,7 +167,6 @@ function ConfirmDialog({ open, onClose, onConfirm, loading, title, titleColor, i
     );
 }
 
-// ─── DuplicateNumbersWarning ──────────────────────────────────────────────────
 function DuplicateNumbersWarning({ duplicates, onRemoveAll, onKeepAll }) {
     const theme = useTheme();
     const W = theme.palette.warning.main;
@@ -171,7 +196,6 @@ function DuplicateNumbersWarning({ duplicates, onRemoveAll, onKeepAll }) {
     );
 }
 
-// ─── BulkUploadErrorDetails ───────────────────────────────────────────────────
 function BulkUploadErrorDetails({ errors, onRetry, onClear }) {
     const theme = useTheme();
     const RED = theme.palette.error.main;
@@ -205,49 +229,46 @@ function BulkUploadErrorDetails({ errors, onRetry, onClear }) {
     );
 }
 
-// ─── CountryCodeRow ───────────────────────────────────────────────────────────
-// Two independent selection systems:
-//   1. OUTER checkbox (group header) → globalSelectedRows (for top-level bulk ops)
-//   2. INNER checkbox (each number row) → innerSelected (for row-level actions within group)
 function CountryCodeRow({
     group,
     globalSelectedRows,
     onGlobalSelectGroup,
     onEdit, onDelete, onDeleteGroup,
     theme, colors: { BLUE, RED, GREEN, TEXT },
-    getStatusStyle, getStatusLabel,
     onSuccess, onError,
 }) {
     const [open, setOpen] = useState(false);
     const [innerPage, setInnerPage] = useState(0);
     const [innerSelected, setInnerSelected] = useState([]);
-    const [innerActionLoading, setInnerActionLoading] = useState(false);
+    const [innerConfirmDialog, setInnerConfirmDialog] = useState({
+        open: false,
+        loading: false,
+        type: null,
+        targetStatus: null,
+        confirmData: {}
+    });
 
     const groupIds = group.items.map(i => i._id);
 
     useEffect(() => { setInnerPage(0); }, [group.country_code]);
 
-    // Paginated slice
     const pagedItems = group.items.slice(innerPage * INNER_PAGE_SIZE, (innerPage + 1) * INNER_PAGE_SIZE);
-    const pagedIds   = pagedItems.map(i => i._id);
+    const pagedIds = pagedItems.map(i => i._id);
 
-    // Inner selection (page-scoped select-all)
-    const innerSelectedOnPage    = pagedIds.filter(id => innerSelected.includes(id));
+    const innerSelectedOnPage = pagedIds.filter(id => innerSelected.includes(id));
     const innerAllOnPageSelected = pagedIds.length > 0 && innerSelectedOnPage.length === pagedIds.length;
     const innerSomeOnPageSelected = innerSelectedOnPage.length > 0 && !innerAllOnPageSelected;
 
-    // Global selection (group-level)
     const globalSelectedInGroup = groupIds.filter(id => globalSelectedRows.includes(id));
-    const globalAllSelected  = groupIds.length > 0 && globalSelectedInGroup.length === groupIds.length;
+    const globalAllSelected = groupIds.length > 0 && globalSelectedInGroup.length === groupIds.length;
     const globalSomeSelected = globalSelectedInGroup.length > 0 && !globalAllSelected;
-    const hasGlobalChild     = globalSelectedInGroup.length > 0;
+    const hasGlobalChild = globalSelectedInGroup.length > 0;
 
-    const activeCount   = group.items.filter(i =>  i.is_active).length;
-    const inactiveCount = group.items.length - activeCount;
-
-    // Inner stats
-    const innerActiveSelected   = group.items.filter(i => innerSelected.includes(i._id) &&  i.is_active).length;
-    const innerInactiveSelected = group.items.filter(i => innerSelected.includes(i._id) && !i.is_active).length;
+    const statusCounts = {
+        inactive: group.items.filter(i => i.is_active === 'inactive').length,
+        running: group.items.filter(i => i.is_active === 'running').length,
+        completed: group.items.filter(i => i.is_active === 'completed').length,
+    };
 
     const handleRowClick = (e) => {
         if (e.target.closest('input[type="checkbox"]') || e.target.closest('button') ||
@@ -266,52 +287,80 @@ function CountryCodeRow({
     const handleInnerSelectRow = (id) =>
         setInnerSelected(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
 
-    // Inner bulk actions
-    const buildUpdatePayload = (item, is_active) => ({
-        id: item._id,
-        data: {
-            country_code: item.country_code,
-            number: item.number,
-            browser_reset_time: item.browser_reset_time,
-            password_formatters: item.password_formatters?.map(f => ({
-                id: String(f._id), start_add: f.start_add,
-                start_index: f.start_index, end_index: f.end_index, end_add: f.end_add,
-            })) ?? [],
-            is_active,
-        },
-    });
-
-    const handleInnerMarkStatus = async (targetStatus) => {
+    const handleInnerMarkStatus = (targetStatus) => {
         const toUpdate = group.items.filter(i => innerSelected.includes(i._id) && i.is_active !== targetStatus);
-        setInnerActionLoading(true);
-        const results = await Promise.allSettled(toUpdate.map(item => updatePhoneNumber(buildUpdatePayload(item, targetStatus))));
-        const ok  = results.filter(r => r.status === 'fulfilled').length;
-        const bad = results.filter(r => r.status === 'rejected').length;
-        setInnerSelected([]);
-        setInnerActionLoading(false);
-        window.__queryClient?.invalidateQueries(['phoneNumbers']);
-        bad === 0
-            ? onSuccess(`${ok} number${ok !== 1 ? 's' : ''} marked as ${targetStatus ? 'active' : 'inactive'}`)
-            : onError(`${ok} updated, ${bad} failed`);
+        const count = toUpdate.length;
+        const statusLabel = getStatusLabel(targetStatus);
+        const statusColor = STATUS_COLORS[targetStatus].color;
+        const Icon = getStatusIcon(targetStatus);
+
+        setInnerConfirmDialog({
+            open: true,
+            loading: false,
+            type: 'status',
+            targetStatus,
+            confirmData: {
+                title: `Mark as ${statusLabel}`,
+                titleColor: statusColor,
+                iconComponent: Icon,
+                message: <>Are you sure you want to mark <strong>{count} phone number{count !== 1 ? 's' : ''}</strong> as <strong style={{ color: statusColor }}>{statusLabel}</strong>?</>,
+                confirmLabel: `Mark ${count} as ${statusLabel}`,
+                confirmColor: statusColor,
+                confirmColorDark: statusColor,
+                count,
+            }
+        });
     };
 
-    const handleInnerDelete = async () => {
-        const toDelete = [...innerSelected];
-        setInnerActionLoading(true);
-        const results = await Promise.allSettled(toDelete.map(id => deletePhoneNumber(id)));
-        const ok  = results.filter(r => r.status === 'fulfilled').length;
-        const bad = results.filter(r => r.status === 'rejected').length;
-        setInnerSelected([]);
-        setInnerActionLoading(false);
-        window.__queryClient?.invalidateQueries(['phoneNumbers']);
-        bad === 0
-            ? onSuccess(`${ok} number${ok !== 1 ? 's' : ''} deleted`)
-            : onError(`${ok} deleted, ${bad} failed`);
+    const handleInnerDelete = () => {
+        const count = innerSelected.length;
+        setInnerConfirmDialog({
+            open: true,
+            loading: false,
+            type: 'delete',
+            confirmData: {
+                title: 'Confirm Delete',
+                titleColor: RED,
+                iconComponent: DeleteIcon,
+                message: <>Are you sure you want to delete <strong>{count} phone number{count !== 1 ? 's' : ''}</strong>? This action cannot be undone.</>,
+                confirmLabel: `Delete ${count}`,
+                confirmColor: RED,
+                confirmColorDark: theme.palette.error.dark,
+                count,
+            }
+        });
+    };
+
+    const closeInnerConfirm = () => {
+        if (innerConfirmDialog.loading) return;
+        setInnerConfirmDialog({ open: false, loading: false, type: null, targetStatus: null, confirmData: {} });
+    };
+
+    const confirmInnerAction = async () => {
+        setInnerConfirmDialog(prev => ({ ...prev, loading: true }));
+
+        try {
+            if (innerConfirmDialog.type === 'status') {
+                const result = await bulkUpdatePhoneNumberStatus(innerSelected, innerConfirmDialog.targetStatus);
+                setInnerSelected([]);
+                onSuccess(result.message);
+            } else if (innerConfirmDialog.type === 'delete') {
+                const result = await bulkDeletePhoneNumbers(innerSelected);
+                setInnerSelected([]);
+                onSuccess(result.message);
+            }
+            closeInnerConfirm();
+        } catch (error) {
+            const msg = error.response?.data?.message || 'Operation failed';
+            onError(msg);
+            closeInnerConfirm();
+        } finally {
+            window.__queryClient?.invalidateQueries(['phoneNumbers']);
+        }
     };
 
     return (
         <>
-            {/* ── Group header row ── */}
             <TableRow onClick={handleRowClick} sx={{
                 cursor: 'pointer',
                 backgroundColor: hasGlobalChild
@@ -322,7 +371,6 @@ function CountryCodeRow({
                 transition: 'background-color 0.15s ease, border-left 0.15s ease',
                 userSelect: 'none',
             }}>
-                {/* OUTER checkbox → global selection */}
                 <TableCell padding="checkbox" sx={{ pl: 1.5, width: 48 }} onClick={e => e.stopPropagation()}>
                     <Tooltip title="Select group for global bulk operations" placement="top">
                         <Checkbox size="small" checked={globalAllSelected} indeterminate={globalSomeSelected}
@@ -341,13 +389,17 @@ function CountryCodeRow({
 
                         <Chip size="small" label={`${group.items.length} Total`} sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(TEXT, 0.08), color: TEXT, border: `1px solid ${alpha(TEXT, 0.2)}`, '& .MuiChip-label': { px: 0.7 } }} />
 
-                        {activeCount > 0 && (
-                            <Chip size="small" icon={<CheckCircleIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${activeCount} Active`}
-                                sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(GREEN, 0.1), color: GREEN, border: `1px solid ${alpha(GREEN, 0.3)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
+                        {statusCounts.inactive > 0 && (
+                            <Chip size="small" icon={<BlockIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${statusCounts.inactive} Inactive`}
+                                sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(STATUS_COLORS.inactive.color, 0.1), color: STATUS_COLORS.inactive.color, border: `1px solid ${alpha(STATUS_COLORS.inactive.color, 0.3)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
                         )}
-                        {inactiveCount > 0 && (
-                            <Chip size="small" icon={<BlockIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${inactiveCount} Inactive`}
-                                sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(RED, 0.08), color: RED, border: `1px solid ${alpha(RED, 0.25)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
+                        {statusCounts.running > 0 && (
+                            <Chip size="small" icon={<PlayArrowIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${statusCounts.running} Running`}
+                                sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(STATUS_COLORS.running.color, 0.1), color: STATUS_COLORS.running.color, border: `1px solid ${alpha(STATUS_COLORS.running.color, 0.3)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
+                        )}
+                        {statusCounts.completed > 0 && (
+                            <Chip size="small" icon={<DoneIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${statusCounts.completed} Completed`}
+                                sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(STATUS_COLORS.completed.color, 0.1), color: STATUS_COLORS.completed.color, border: `1px solid ${alpha(STATUS_COLORS.completed.color, 0.3)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
                         )}
                         {hasGlobalChild && (
                             <Chip size="small" label={`${globalSelectedInGroup.length} in bulk`}
@@ -368,63 +420,47 @@ function CountryCodeRow({
                 </TableCell>
             </TableRow>
 
-            {/* ── Expanded inner numbers table ── */}
             <TableRow>
                 <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
                     <Collapse in={open} timeout="auto" unmountOnExit>
                         <Box sx={{ borderLeft: `3px solid ${alpha(BLUE, 0.2)}`, ml: 3 }}>
 
-                            {/* ── Inner selection action bar ── */}
                             {innerSelected.length > 0 && (
                                 <Box display="flex" alignItems="center" gap={1} px={2} py={0.8}
                                     sx={{ backgroundColor: alpha(BLUE, theme.palette.mode === 'dark' ? 0.1 : 0.04), borderBottom: `1px solid ${alpha(BLUE, 0.12)}`, flexWrap: 'wrap' }}>
                                     <Typography sx={{ fontSize: '0.78rem', color: BLUE, fontWeight: 600 }}>
                                         {innerSelected.length} selected
                                     </Typography>
-                                    {innerActiveSelected > 0 && (
-                                        <Chip size="small" label={`${innerActiveSelected} active`}
-                                            sx={{ height: 18, borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600, backgroundColor: alpha(GREEN, 0.1), color: GREEN, border: `1px solid ${alpha(GREEN, 0.3)}`, '& .MuiChip-label': { px: 0.6 } }} />
-                                    )}
-                                    {innerInactiveSelected > 0 && (
-                                        <Chip size="small" label={`${innerInactiveSelected} inactive`}
-                                            sx={{ height: 18, borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600, backgroundColor: alpha(RED, 0.08), color: RED, border: `1px solid ${alpha(RED, 0.25)}`, '& .MuiChip-label': { px: 0.6 } }} />
-                                    )}
                                     <Box flex={1} />
 
-                                    {innerInactiveSelected > 0 && (
-                                        <Button size="small" variant="contained" disabled={innerActionLoading}
-                                            startIcon={innerActionLoading ? <CircularProgress size={12} sx={{ color: 'white' }} /> : <ToggleOnIcon sx={{ fontSize: '0.8rem' }} />}
-                                            onClick={() => handleInnerMarkStatus(true)}
-                                            sx={{ fontSize: '0.72rem', py: 0.3, px: 1, height: 26, textTransform: 'none', background: `linear-gradient(135deg, ${theme.palette.success.dark} 0%, ${GREEN} 100%)`, color: 'white', borderRadius: '6px', '&:hover': { filter: 'brightness(1.1)' } }}>
-                                            Mark Active ({innerInactiveSelected})
-                                        </Button>
-                                    )}
-                                    {innerActiveSelected > 0 && (
-                                        <Button size="small" variant="contained" disabled={innerActionLoading}
-                                            startIcon={innerActionLoading ? <CircularProgress size={12} sx={{ color: 'white' }} /> : <ToggleOffIcon sx={{ fontSize: '0.8rem' }} />}
-                                            onClick={() => handleInnerMarkStatus(false)}
-                                            sx={{ fontSize: '0.72rem', py: 0.3, px: 1, height: 26, textTransform: 'none', background: `linear-gradient(135deg, ${theme.palette.warning.dark} 0%, ${theme.palette.warning.main} 100%)`, color: 'white', borderRadius: '6px', '&:hover': { filter: 'brightness(1.1)' } }}>
-                                            Mark Inactive ({innerActiveSelected})
-                                        </Button>
-                                    )}
-                                    <Button size="small" variant="contained" disabled={innerActionLoading}
-                                        startIcon={innerActionLoading ? <CircularProgress size={12} sx={{ color: 'white' }} /> : <DeleteSweepIcon sx={{ fontSize: '0.8rem' }} />}
+                                    {STATUS_ENUM.map(status => {
+                                        const selectedWithDifferentStatus = group.items.filter(i => innerSelected.includes(i._id) && i.is_active !== status).length;
+                                        return selectedWithDifferentStatus > 0 ? (
+                                            <Button key={status} size="small" variant="contained" disabled={innerConfirmDialog.loading}
+                                                startIcon={innerConfirmDialog.loading ? <CircularProgress size={12} sx={{ color: 'white' }} /> : React.createElement(getStatusIcon(status), { sx: { fontSize: '0.8rem' } })}
+                                                onClick={() => handleInnerMarkStatus(status)}
+                                                sx={{ fontSize: '0.72rem', py: 0.3, px: 1, height: 26, textTransform: 'none', background: `linear-gradient(135deg, ${STATUS_COLORS[status].color} 0%, ${alpha(STATUS_COLORS[status].color, 0.7)} 100%)`, color: 'white', borderRadius: '6px', '&:hover': { filter: 'brightness(1.1)' } }}>
+                                                {getStatusLabel(status)} ({selectedWithDifferentStatus})
+                                            </Button>
+                                        ) : null;
+                                    })}
+
+                                    <Button size="small" variant="contained" disabled={innerConfirmDialog.loading}
+                                        startIcon={innerConfirmDialog.loading ? <CircularProgress size={12} sx={{ color: 'white' }} /> : <DeleteSweepIcon sx={{ fontSize: '0.8rem' }} />}
                                         onClick={handleInnerDelete}
                                         sx={{ fontSize: '0.72rem', py: 0.3, px: 1, height: 26, textTransform: 'none', background: `linear-gradient(135deg, ${theme.palette.error.dark} 0%, ${RED} 100%)`, color: 'white', borderRadius: '6px', '&:hover': { filter: 'brightness(1.1)' } }}>
                                         Delete ({innerSelected.length})
                                     </Button>
-                                    <Button size="small" disabled={innerActionLoading} onClick={() => setInnerSelected([])}
+                                    <Button size="small" disabled={innerConfirmDialog.loading} onClick={() => setInnerSelected([])}
                                         sx={{ fontSize: '0.7rem', color: alpha(TEXT, 0.45), textTransform: 'none', minWidth: 0, px: 0.8 }}>
                                         Clear
                                     </Button>
                                 </Box>
                             )}
 
-                            {/* ── Inner table header ── */}
                             <Table size="small">
                                 <TableHead>
                                     <TableRow sx={{ backgroundColor: alpha(BLUE, theme.palette.mode === 'dark' ? 0.04 : 0.02) }}>
-                                        {/* INNER checkbox → inner selection only */}
                                         <TableCell padding="checkbox" sx={{ pl: 1.5, width: 48, py: 0.8, borderBottom: `1px solid ${alpha(BLUE, 0.18)}` }}>
                                             <Tooltip title="Select all on this page" placement="top">
                                                 <Checkbox size="small"
@@ -435,9 +471,9 @@ function CountryCodeRow({
                                                 />
                                             </Tooltip>
                                         </TableCell>
-                                        {['Phone Number', 'Browser Reset', 'Password Formatters', 'Status', 'Actions'].map((label, i) => (
-                                            <TableCell key={label} align={i === 4 ? 'right' : 'left'}
-                                                sx={{ py: 0.9, fontSize: '0.78rem', fontWeight: 700, color: TEXT, borderBottom: `1px solid ${alpha(BLUE, 0.18)}`, pl: i === 0 ? 2 : undefined, pr: i === 4 ? 1.5 : undefined }}>
+                                        {['Phone Number', 'Password Formatters', 'Status', 'Actions'].map((label, i) => (
+                                            <TableCell key={label} align={i === 3 ? 'right' : 'left'}
+                                                sx={{ py: 0.9, fontSize: '0.78rem', fontWeight: 700, color: TEXT, borderBottom: `1px solid ${alpha(BLUE, 0.18)}`, pl: i === 0 ? 2 : undefined, pr: i === 3 ? 1.5 : undefined }}>
                                                 {label}
                                             </TableCell>
                                         ))}
@@ -456,11 +492,6 @@ function CountryCodeRow({
                                                     <Typography sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: TEXT, letterSpacing: '0.02em' }}>{item.number}</Typography>
                                                 </TableCell>
                                                 <TableCell sx={cellSx}>
-                                                    {item.browser_reset_time
-                                                        ? <Typography sx={{ fontSize: '0.82rem', color: TEXT }}>{item.browser_reset_time}</Typography>
-                                                        : <Typography sx={{ fontSize: '0.75rem', color: alpha(TEXT, 0.35), fontStyle: 'italic' }}>—</Typography>}
-                                                </TableCell>
-                                                <TableCell sx={cellSx}>
                                                     <Box display="flex" gap={0.5} flexWrap="wrap">
                                                         {item.password_formatters?.length > 0
                                                             ? item.password_formatters.map(f => (
@@ -474,7 +505,7 @@ function CountryCodeRow({
                                                 </TableCell>
                                                 <TableCell sx={cellSx}>
                                                     <Chip label={getStatusLabel(item.is_active)} size="small" variant="outlined"
-                                                        icon={item.is_active ? <CheckCircleIcon sx={{ fontSize: '0.72rem !important' }} /> : <BlockIcon sx={{ fontSize: '0.72rem !important' }} />}
+                                                        icon={React.createElement(getStatusIcon(item.is_active), { sx: { fontSize: '0.72rem !important' } })}
                                                         sx={{ height: 22, borderRadius: '4px', fontWeight: 500, fontSize: '0.72rem', ...getStatusStyle(item.is_active), '& .MuiChip-label': { px: 0.8 } }} />
                                                 </TableCell>
                                                 <TableCell align="right" sx={{ ...cellSx, pr: 1.5 }}>
@@ -497,7 +528,6 @@ function CountryCodeRow({
                                 </TableBody>
                             </Table>
 
-                            {/* ── Inner pagination (only if > 50 items) ── */}
                             {group.items.length > INNER_PAGE_SIZE && (
                                 <Box sx={{ borderTop: `1px solid ${alpha(BLUE, 0.12)}`, backgroundColor: alpha(BLUE, theme.palette.mode === 'dark' ? 0.03 : 0.01) }}>
                                     <TablePagination
@@ -520,54 +550,73 @@ function CountryCodeRow({
                     </Collapse>
                 </TableCell>
             </TableRow>
+
+            <ConfirmDialog
+                open={innerConfirmDialog.open}
+                onClose={closeInnerConfirm}
+                onConfirm={confirmInnerAction}
+                loading={innerConfirmDialog.loading}
+                title={innerConfirmDialog.confirmData.title}
+                titleColor={innerConfirmDialog.confirmData.titleColor}
+                iconComponent={innerConfirmDialog.confirmData.iconComponent}
+                message={innerConfirmDialog.confirmData.message}
+                confirmLabel={innerConfirmDialog.confirmData.confirmLabel}
+                confirmColor={innerConfirmDialog.confirmData.confirmColor}
+                confirmColorDark={innerConfirmDialog.confirmData.confirmColorDark}
+            />
         </>
     );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export const PhoneNumbers = () => {
     const theme = useTheme();
     const queryClient = useQueryClient();
 
-    // Expose queryClient for inner row actions
     useEffect(() => { window.__queryClient = queryClient; }, [queryClient]);
 
-    const BLUE        = theme.palette.primary.main;
-    const BLUE_DARK   = theme.palette.primary.dark;
-    const RED         = theme.palette.error.main;
-    const RED_DARK    = theme.palette.error.dark;
-    const GREEN       = theme.palette.success.main;
-    const GREEN_DARK  = theme.palette.success.dark;
-    const ORANGE      = theme.palette.warning.main;
-    const ORANGE_DARK = theme.palette.warning.dark;
-    const TEXT        = theme.palette.text.primary;
-    const colors      = { BLUE, RED, GREEN, TEXT };
+    const BLUE = theme.palette.primary.main;
+    const BLUE_DARK = theme.palette.primary.dark;
+    const RED = theme.palette.error.main;
+    const RED_DARK = theme.palette.error.dark;
+    const GREEN = theme.palette.success.main;
+    const GREEN_DARK = theme.palette.success.dark;
+    const TEXT = theme.palette.text.primary;
+    const colors = { BLUE, RED, GREEN, TEXT };
 
-    const [openDialog,          setOpenDialog]          = useState(false);
-    const [selectedNumber,      setSelectedNumber]      = useState(null);
-    const [globalSelectedRows,  setGlobalSelectedRows]  = useState([]);
-    const [success,             setSuccess]             = useState('');
-    const [error,               setError]               = useState('');
-    const [searchQuery,         setSearchQuery]         = useState('');
-    const [statusFilter,        setStatusFilter]        = useState('all');
-    const [page,                setPage]                = useState(0);
-    const [rowsPerPage,         setRowsPerPage]         = useState(10);
-    const [debouncedSearch,     setDebouncedSearch]     = useState('');
-    const [formData,            setFormData]            = useState(initialFormData);
-    const [bulkUploadState,     setBulkUploadState]     = useState(null);
-    const [bulkUploadErrors,    setBulkUploadErrors]    = useState([]);
-    const [duplicateNumbers,    setDuplicateNumbers]    = useState([]);
+    const [openDialog, setOpenDialog] = useState(false);
+    const [selectedNumber, setSelectedNumber] = useState(null);
+    const [globalSelectedRows, setGlobalSelectedRows] = useState([]);
+    const [success, setSuccess] = useState('');
+    const [error, setError] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [formData, setFormData] = useState(initialFormData);
+    const [bulkUploadState, setBulkUploadState] = useState(null);
+    const [bulkUploadErrors, setBulkUploadErrors] = useState([]);
+    const [duplicateNumbers, setDuplicateNumbers] = useState([]);
 
     const CONFIRM_DEFAULT = {
-        open: false, loading: false, title: '', titleColor: RED,
-        icon: DeleteIcon, message: '', confirmLabel: '',
-        confirmColor: RED, confirmColorDark: RED_DARK, onConfirm: null,
+        open: false, 
+        loading: false, 
+        title: '', 
+        titleColor: RED,
+        iconComponent: DeleteIcon, 
+        message: '', 
+        confirmLabel: '',
+        confirmColor: RED, 
+        confirmColorDark: RED_DARK, 
+        onConfirm: null,
     };
     const [confirmDialog, setConfirmDialog] = useState(CONFIRM_DEFAULT);
 
-    const closeConfirm      = () => { if (confirmDialog.loading) return; setConfirmDialog(CONFIRM_DEFAULT); };
-    const openConfirm       = (cfg) => setConfirmDialog({ ...CONFIRM_DEFAULT, open: true, ...cfg });
-    const setConfirmLoading = (v) => setConfirmDialog(d => ({ ...d, loading: v }));
+    const closeConfirm = () => {
+        if (confirmDialog.loading) return;
+        setConfirmDialog(CONFIRM_DEFAULT);
+    };
+    const openConfirm = (cfg) => setConfirmDialog({ ...CONFIRM_DEFAULT, open: true, ...cfg });
 
     useEffect(() => {
         const t = setTimeout(() => { setDebouncedSearch(searchQuery); setPage(0); }, 500);
@@ -578,7 +627,7 @@ export const PhoneNumbers = () => {
 
     const { data: phoneNumbersData, isLoading, isError, error: queryError, refetch } = useQuery({
         queryKey: ['phoneNumbers', page, rowsPerPage, debouncedSearch],
-        queryFn: fetchPhoneNumbers,
+        queryFn: () => fetchPhoneNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
         keepPreviousData: true,
     });
 
@@ -589,44 +638,115 @@ export const PhoneNumbers = () => {
 
     const createMutation = useMutation({
         mutationFn: createPhoneNumber,
-        onSuccess: (data) => { queryClient.invalidateQueries(['phoneNumbers']); setSuccess(data.message || 'Phone number(s) created successfully'); },
-        onError: (err) => { const m = err.response?.data?.message || 'Failed to create phone number'; return Promise.reject({ message: m, number: err.config?.data?.number }); },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['phoneNumbers']);
+            setSuccess(data.message || 'Phone number created successfully');
+            setOpenDialog(false);
+            resetForm();
+        },
+        onError: (err) => {
+            const m = err.response?.data?.message || 'Failed to create phone number';
+            setError(m);
+        },
+    });
+
+    const bulkCreateMutation = useMutation({
+        mutationFn: bulkCreatePhoneNumbers,
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['phoneNumbers']);
+            setSuccess(data.message);
+            setOpenDialog(false);
+            resetForm();
+        },
+        onError: (err) => {
+            const response = err.response?.data;
+            if (response?.existingNumbers) {
+                setError(`Numbers already exist: ${response.existingNumbers.join(', ')}`);
+            } else if (response?.duplicates) {
+                setError(`Duplicate numbers in request: ${response.duplicates.join(', ')}`);
+            } else {
+                setError(response?.message || 'Failed to create phone numbers');
+            }
+        },
     });
 
     const updateMutation = useMutation({
         mutationFn: updatePhoneNumber,
-        onSuccess: (data) => { queryClient.invalidateQueries(['phoneNumbers']); setSuccess(data.message || 'Phone number updated successfully'); setOpenDialog(false); resetForm(); },
-        onError: (err) => { setError(err.response?.data?.message || 'Failed to update phone number'); },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['phoneNumbers']);
+            setSuccess(data.message || 'Phone number updated successfully');
+            setOpenDialog(false);
+            resetForm();
+        },
+        onError: (err) => {
+            setError(err.response?.data?.message || 'Failed to update phone number');
+        },
     });
 
     const deleteMutation = useMutation({
         mutationFn: deletePhoneNumber,
-        onSuccess: (data) => { queryClient.invalidateQueries(['phoneNumbers']); setSuccess(data.message || 'Phone number deleted successfully'); closeConfirm(); },
-        onError: (err) => { setError(err.response?.data?.message || 'Failed to delete phone number'); setConfirmLoading(false); },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['phoneNumbers']);
+            setSuccess(data.message || 'Phone number deleted successfully');
+            closeConfirm();
+        },
+        onError: (err) => {
+            setError(err.response?.data?.message || 'Failed to delete phone number');
+            closeConfirm();
+        },
     });
 
-    const allPhoneNumbers    = phoneNumbersData?.data || [];
-    const passwordFormatters = formattersData?.data  || [];
+    const bulkDeleteMutation = useMutation({
+        mutationFn: bulkDeletePhoneNumbers,
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['phoneNumbers']);
+            setSuccess(data.message);
+            setGlobalSelectedRows([]);
+            closeConfirm();
+        },
+        onError: (err) => {
+            setError(err.response?.data?.message || 'Failed to delete phone numbers');
+            closeConfirm();
+        },
+    });
+
+    const bulkStatusMutation = useMutation({
+        mutationFn: ({ ids, status }) => bulkUpdatePhoneNumberStatus(ids, status),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['phoneNumbers']);
+            setSuccess(data.message);
+            setGlobalSelectedRows([]);
+            closeConfirm();
+        },
+        onError: (err) => {
+            setError(err.response?.data?.message || 'Failed to update status');
+            closeConfirm();
+        },
+    });
+
+    const allPhoneNumbers = phoneNumbersData?.data || [];
+    const passwordFormatters = formattersData?.data || [];
 
     const filteredNumbers = statusFilter === 'all'
         ? allPhoneNumbers
-        : allPhoneNumbers.filter(item => statusFilter === 'active' ? item.is_active : !item.is_active);
+        : allPhoneNumbers.filter(item => item.is_active === statusFilter);
 
-    const groupedNumbers  = groupByCountryCode(filteredNumbers);
+    const groupedNumbers = groupByCountryCode(filteredNumbers);
     const paginatedGroups = groupedNumbers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-    const allVisibleIds      = filteredNumbers.map(item => item._id);
-    const globalAllSelected  = allVisibleIds.length > 0 && allVisibleIds.every(id => globalSelectedRows.includes(id));
+    const allVisibleIds = filteredNumbers.map(item => item._id);
+    const globalAllSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => globalSelectedRows.includes(id));
     const globalSomeSelected = globalSelectedRows.length > 0 && !globalAllSelected;
 
     const globalSelectedItems = useMemo(
         () => allPhoneNumbers.filter(n => globalSelectedRows.includes(n._id)),
         [allPhoneNumbers, globalSelectedRows]
     );
-    const activeSelectedCount   = globalSelectedItems.filter(n =>  n.is_active).length;
-    const inactiveSelectedCount = globalSelectedItems.filter(n => !n.is_active).length;
-    const showMarkInactive = globalSelectedRows.length > 0 && activeSelectedCount   > 0;
-    const showMarkActive   = globalSelectedRows.length > 0 && inactiveSelectedCount > 0;
+    const statusSelectedCounts = {
+        inactive: globalSelectedItems.filter(n => n.is_active === 'inactive').length,
+        running: globalSelectedItems.filter(n => n.is_active === 'running').length,
+        completed: globalSelectedItems.filter(n => n.is_active === 'completed').length,
+    };
 
     const handleSelectAllVisible = () => {
         if (globalAllSelected) {
@@ -649,6 +769,7 @@ export const PhoneNumbers = () => {
         setSelectedNumber(null);
         setBulkUploadErrors([]);
         setDuplicateNumbers([]);
+        setBulkUploadState(null);
     };
 
     const checkForDuplicates = (numbers) => {
@@ -688,9 +809,8 @@ export const PhoneNumbers = () => {
             setFormData({
                 country_code: number.country_code || '',
                 numbers: number.number || '',
-                browser_reset_time: number.browser_reset_time || '',
                 password_formatter_ids: passwordFormatters.length > 0 ? getSelectedFormatterIds(number) : [],
-                is_active: number.is_active || false,
+                is_active: number.is_active || 'inactive',
                 _pendingFormatters: passwordFormatters.length === 0 ? number.password_formatters : null,
             });
         } else {
@@ -717,26 +837,31 @@ export const PhoneNumbers = () => {
 
     const handleDeleteClick = (item) => {
         openConfirm({
-            title: 'Confirm Delete', titleColor: RED, icon: DeleteIcon,
-            message: (<>Are you sure you want to delete <strong>"{item.country_code} {item.number}"</strong>? This action cannot be undone.</>),
-            confirmLabel: 'Delete', confirmColor: RED, confirmColorDark: RED_DARK,
-            onConfirm: () => { setConfirmLoading(true); deleteMutation.mutate(item._id); },
+            title: 'Confirm Delete',
+            titleColor: RED,
+            iconComponent: DeleteIcon,
+            message: <>Are you sure you want to delete <strong>"{item.country_code} {item.number}"</strong>? This action cannot be undone.</>,
+            confirmLabel: 'Delete',
+            confirmColor: RED,
+            confirmColorDark: RED_DARK,
+            onConfirm: () => {
+                deleteMutation.mutate(item._id);
+            },
         });
     };
 
     const handleDeleteGroupClick = (group) => {
         openConfirm({
-            title: 'Delete Group', titleColor: RED, icon: DeleteSweepIcon,
-            message: (<>Are you sure you want to delete all <strong>{group.items.length} number{group.items.length !== 1 ? 's' : ''}</strong> under <strong>{group.country_code}</strong>? This cannot be undone.</>),
-            confirmLabel: `Delete ${group.items.length} Numbers`, confirmColor: RED, confirmColorDark: RED_DARK,
-            onConfirm: async () => {
-                setConfirmLoading(true);
-                const results = await Promise.allSettled(group.items.map(i => deletePhoneNumber(i._id)));
-                const ok  = results.filter(r => r.status === 'fulfilled').length;
-                const bad = results.filter(r => r.status === 'rejected').length;
-                queryClient.invalidateQueries(['phoneNumbers']);
-                setConfirmDialog(CONFIRM_DEFAULT);
-                bad === 0 ? setSuccess(`${ok} phone number${ok > 1 ? 's' : ''} deleted`) : setError(`${ok} deleted, ${bad} failed`);
+            title: 'Delete Group',
+            titleColor: RED,
+            iconComponent: DeleteSweepIcon,
+            message: <>Are you sure you want to delete all <strong>{group.items.length} number{group.items.length !== 1 ? 's' : ''}</strong> under <strong>{group.country_code}</strong>? This cannot be undone.</>,
+            confirmLabel: `Delete ${group.items.length} Numbers`,
+            confirmColor: RED,
+            confirmColorDark: RED_DARK,
+            onConfirm: () => {
+                const ids = group.items.map(i => i._id);
+                bulkDeleteMutation.mutate(ids);
             },
         });
     };
@@ -744,18 +869,15 @@ export const PhoneNumbers = () => {
     const handleBulkDeleteClick = () => {
         const count = globalSelectedRows.length;
         openConfirm({
-            title: 'Confirm Bulk Delete', titleColor: RED, icon: DeleteSweepIcon,
-            message: (<>Are you sure you want to delete <strong>{count} phone number{count > 1 ? 's' : ''}</strong>? This cannot be undone.</>),
-            confirmLabel: `Delete ${count}`, confirmColor: RED, confirmColorDark: RED_DARK,
-            onConfirm: async () => {
-                setConfirmLoading(true);
-                const results = await Promise.allSettled(globalSelectedRows.map(id => deletePhoneNumber(id)));
-                const ok  = results.filter(r => r.status === 'fulfilled').length;
-                const bad = results.filter(r => r.status === 'rejected').length;
-                setGlobalSelectedRows([]);
-                queryClient.invalidateQueries(['phoneNumbers']);
-                setConfirmDialog(CONFIRM_DEFAULT);
-                bad === 0 ? setSuccess(`${ok} phone number${ok > 1 ? 's' : ''} deleted`) : setError(`${ok} deleted, ${bad} failed`);
+            title: 'Confirm Bulk Delete',
+            titleColor: RED,
+            iconComponent: DeleteSweepIcon,
+            message: <>Are you sure you want to delete <strong>{count} phone number{count > 1 ? 's' : ''}</strong>? This cannot be undone.</>,
+            confirmLabel: `Delete ${count}`,
+            confirmColor: RED,
+            confirmColorDark: RED_DARK,
+            onConfirm: () => {
+                bulkDeleteMutation.mutate(globalSelectedRows);
             },
         });
     };
@@ -763,33 +885,22 @@ export const PhoneNumbers = () => {
     const handleBulkStatusClick = (targetStatus) => {
         const toUpdate = globalSelectedItems.filter(n => n.is_active !== targetStatus);
         const count = toUpdate.length;
-        const statusLabel = targetStatus ? 'Active' : 'Inactive';
-        const COLOR = targetStatus ? GREEN : ORANGE;
-        const COLOR_DARK = targetStatus ? GREEN_DARK : ORANGE_DARK;
-        const Icon = targetStatus ? ToggleOnIcon : ToggleOffIcon;
+        const statusLabel = getStatusLabel(targetStatus);
+        const statusColor = STATUS_COLORS[targetStatus].color;
+        const Icon = getStatusIcon(targetStatus);
         openConfirm({
-            title: `Mark as ${statusLabel}`, titleColor: COLOR, icon: Icon,
-            message: (<>Are you sure you want to mark <strong>{count} phone number{count !== 1 ? 's' : ''}</strong> as <strong style={{ color: COLOR }}>{statusLabel}</strong>?</>),
-            confirmLabel: `Mark ${count} as ${statusLabel}`, confirmColor: COLOR, confirmColorDark: COLOR_DARK,
-            onConfirm: async () => {
-                setConfirmLoading(true);
-                const results = await Promise.allSettled(toUpdate.map(item =>
-                    updatePhoneNumber({
-                        id: item._id,
-                        data: {
-                            country_code: item.country_code, number: item.number,
-                            browser_reset_time: item.browser_reset_time,
-                            password_formatters: item.password_formatters?.map(f => ({ id: String(f._id), start_add: f.start_add, start_index: f.start_index, end_index: f.end_index, end_add: f.end_add })) ?? [],
-                            is_active: targetStatus,
-                        },
-                    })
-                ));
-                const ok  = results.filter(r => r.status === 'fulfilled').length;
-                const bad = results.filter(r => r.status === 'rejected').length;
-                setGlobalSelectedRows([]);
-                queryClient.invalidateQueries(['phoneNumbers']);
-                setConfirmDialog(CONFIRM_DEFAULT);
-                bad === 0 ? setSuccess(`${ok} number${ok !== 1 ? 's' : ''} marked as ${statusLabel.toLowerCase()}`) : setError(`${ok} updated, ${bad} failed`);
+            title: `Mark as ${statusLabel}`,
+            titleColor: statusColor,
+            iconComponent: Icon,
+            message: <>Are you sure you want to mark <strong>{count} phone number{count !== 1 ? 's' : ''}</strong> as <strong style={{ color: statusColor }}>{statusLabel}</strong>?</>,
+            confirmLabel: `Mark ${count} as ${statusLabel}`,
+            confirmColor: statusColor,
+            confirmColorDark: statusColor,
+            onConfirm: () => {
+                bulkStatusMutation.mutate({
+                    ids: toUpdate.map(item => item._id),
+                    status: targetStatus
+                });
             },
         });
     };
@@ -805,46 +916,28 @@ export const PhoneNumbers = () => {
                 data: {
                     country_code: formData.country_code,
                     number: formData.numbers.trim(),
-                    browser_reset_time: formData.browser_reset_time === '' ? undefined : Number(formData.browser_reset_time),
                     password_formatters: selectedFormatters,
                     is_active: formData.is_active,
                 },
             });
         } else {
             const nums = parseNumbers(formData.numbers);
-            if (nums.length === 0)                    { setError('Please enter at least one phone number'); return; }
-            if (duplicateNumbers.length > 0)          { setError(`Remove duplicates first: ${duplicateNumbers.join(', ')}`); return; }
+            if (nums.length === 0) { setError('Please enter at least one phone number'); return; }
+            if (duplicateNumbers.length > 0) { setError(`Remove duplicates first: ${duplicateNumbers.join(', ')}`); return; }
             if (nums.length > MAX_NUMBERS_PER_UPLOAD) { setError(`Max ${MAX_NUMBERS_PER_UPLOAD} numbers at once. You entered ${nums.length}.`); return; }
 
-            setBulkUploadState({ total: nums.length, done: 0 });
-            setBulkUploadErrors([]);
-            const errors = []; let succeeded = 0;
-
-            for (const num of nums) {
-                try {
-                    await createMutation.mutateAsync({
-                        country_code: formData.country_code, number: num,
-                        browser_reset_time: formData.browser_reset_time === '' ? undefined : Number(formData.browser_reset_time),
-                        password_formatters: selectedFormatters,
-                    });
-                    succeeded++;
-                } catch (err) {
-                    errors.push({ number: num, message: err.message || 'Failed to create phone number' });
-                }
-                setBulkUploadState(prev => ({ ...prev, done: prev.done + 1 }));
-            }
-
-            setBulkUploadState(null);
-            queryClient.invalidateQueries(['phoneNumbers']);
-
-            if (errors.length === 0) {
-                setSuccess(`${succeeded} phone number${succeeded > 1 ? 's' : ''} created successfully`);
-                setOpenDialog(false);
-                resetForm();
+            if (nums.length > 1) {
+                bulkCreateMutation.mutate({
+                    country_code: formData.country_code,
+                    numbers: nums,
+                    password_formatters: selectedFormatters,
+                });
             } else {
-                setBulkUploadErrors(errors);
-                setFormData(prev => ({ ...prev, numbers: errors.map(e => e.number).join('\n') }));
-                setError(`${succeeded} succeeded, ${errors.length} failed. See details below.`);
+                createMutation.mutate({
+                    country_code: formData.country_code,
+                    number: nums[0],
+                    password_formatters: selectedFormatters,
+                });
             }
         }
     };
@@ -857,20 +950,13 @@ export const PhoneNumbers = () => {
         return { warnings };
     };
 
-    const getStatusStyle = (isActive) => ({
-        backgroundColor: alpha(isActive ? GREEN : RED, 0.1),
-        color: isActive ? GREEN : RED,
-        borderColor: isActive ? GREEN : RED,
-    });
-    const getStatusLabel = (isActive) => isActive ? 'Active' : 'Inactive';
-
     const parsedCount = parseNumbers(formData.numbers).length;
     const { warnings: validationWarnings } = !selectedNumber && formData.numbers
         ? validateNumbersInput(formData.numbers)
         : { warnings: [] };
 
-    const isMutating = createMutation.isLoading || updateMutation.isLoading;
-    const MenuProps  = { PaperProps: { style: { maxHeight: 220, width: 260 } } };
+    const isMutating = createMutation.isLoading || updateMutation.isLoading || bulkCreateMutation.isLoading;
+    const MenuProps = { PaperProps: { style: { maxHeight: 220, width: 260 } } };
 
     const snackbarBaseSx = (color) => ({
         width: '100%', borderRadius: '10px',
@@ -892,7 +978,6 @@ export const PhoneNumbers = () => {
         <Box>
             <Helmet><title>Phone Numbers | Power Automate</title></Helmet>
 
-            {/* ── Page header ── */}
             <Box display="flex" justifyContent="space-between" alignItems="flex-start" flexWrap="wrap" gap={2} mb={globalSelectedRows.length > 0 ? 1.5 : 3}>
                 <Box>
                     <Typography sx={{ fontWeight: 700, mb: 0.4, fontSize: { xs: '1rem', sm: '1.1rem' }, background: `linear-gradient(135deg, ${BLUE_DARK} 0%, ${BLUE} 100%)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
@@ -903,36 +988,13 @@ export const PhoneNumbers = () => {
                     </Typography>
                 </Box>
                 <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
-                    {showMarkInactive && (
-                        <Tooltip title={`Mark ${activeSelectedCount} active number${activeSelectedCount !== 1 ? 's' : ''} as Inactive`} placement="bottom">
-                            <Button variant="contained" size="small" startIcon={<ToggleOffIcon sx={{ fontSize: '1rem' }} />} onClick={() => handleBulkStatusClick(false)}
-                                sx={{ background: `linear-gradient(135deg, ${ORANGE_DARK} 0%, ${ORANGE} 100%)`, color: 'white', fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36, textTransform: 'none', fontWeight: 500, borderRadius: '8px', '&:hover': { filter: 'brightness(1.1)' } }}>
-                                Mark Inactive ({activeSelectedCount})
-                            </Button>
-                        </Tooltip>
-                    )}
-                    {showMarkActive && (
-                        <Tooltip title={`Mark ${inactiveSelectedCount} inactive number${inactiveSelectedCount !== 1 ? 's' : ''} as Active`} placement="bottom">
-                            <Button variant="contained" size="small" startIcon={<ToggleOnIcon sx={{ fontSize: '1rem' }} />} onClick={() => handleBulkStatusClick(true)}
-                                sx={{ background: `linear-gradient(135deg, ${GREEN_DARK} 0%, ${GREEN} 100%)`, color: 'white', fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36, textTransform: 'none', fontWeight: 500, borderRadius: '8px', '&:hover': { filter: 'brightness(1.1)' } }}>
-                                Mark Active ({inactiveSelectedCount})
-                            </Button>
-                        </Tooltip>
-                    )}
-                    {globalSelectedRows.length > 0 && (
-                        <Button variant="contained" size="small" startIcon={<DeleteSweepIcon sx={{ fontSize: '0.9rem' }} />} onClick={handleBulkDeleteClick}
-                            sx={{ background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED} 100%)`, color: 'white', fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36, textTransform: 'none', fontWeight: 500, borderRadius: '8px', '&:hover': { background: `linear-gradient(135deg, ${RED} 0%, #b91c1c 100%)` } }}>
-                            Delete ({globalSelectedRows.length})
-                        </Button>
-                    )}
                     <GradientButton variant="contained" startIcon={<AddIcon sx={{ fontSize: '0.9rem' }} />} onClick={() => handleOpenDialog()} size="small"
-                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }} disabled={createMutation.isLoading}>
+                        sx={{ fontSize: '0.8rem', py: 0.6, px: 1.5, height: 36 }} disabled={isMutating}>
                         Add Phone Numbers
                     </GradientButton>
                 </Box>
             </Box>
 
-            {/* ── Global selection info bar ── */}
             {globalSelectedRows.length > 0 && (
                 <Box display="flex" alignItems="center" gap={1.5} mb={2.5} px={2} py={1}
                     sx={{ borderRadius: 1.5, backgroundColor: alpha(BLUE, theme.palette.mode === 'dark' ? 0.1 : 0.05), border: `1px solid ${alpha(BLUE, 0.2)}`, flexWrap: 'wrap' }}>
@@ -940,14 +1002,10 @@ export const PhoneNumbers = () => {
                     <Typography sx={{ fontSize: '0.8rem', color: BLUE, fontWeight: 600 }}>
                         {globalSelectedRows.length} number{globalSelectedRows.length !== 1 ? 's' : ''} selected for global bulk operations
                     </Typography>
-                    {activeSelectedCount > 0 && (
-                        <Chip size="small" icon={<CheckCircleIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${activeSelectedCount} active`}
-                            sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(GREEN, 0.1), color: GREEN, border: `1px solid ${alpha(GREEN, 0.3)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
-                    )}
-                    {inactiveSelectedCount > 0 && (
-                        <Chip size="small" icon={<BlockIcon sx={{ fontSize: '0.65rem !important' }} />} label={`${inactiveSelectedCount} inactive`}
-                            sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(RED, 0.08), color: RED, border: `1px solid ${alpha(RED, 0.25)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
-                    )}
+                    {Object.entries(statusSelectedCounts).map(([status, count]) => count > 0 ? (
+                        <Chip key={status} size="small" icon={React.createElement(getStatusIcon(status), { sx: { fontSize: '0.65rem !important' } })} label={`${count} ${getStatusLabel(status).toLowerCase()}`}
+                            sx={{ height: 20, borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, backgroundColor: alpha(STATUS_COLORS[status].color, 0.1), color: STATUS_COLORS[status].color, border: `1px solid ${alpha(STATUS_COLORS[status].color, 0.3)}`, '& .MuiChip-label': { px: 0.7 }, '& .MuiChip-icon': { ml: 0.5 } }} />
+                    ) : null)}
                     <Box flex={1} />
                     <Button size="small" onClick={() => setGlobalSelectedRows([])}
                         sx={{ fontSize: '0.75rem', color: alpha(TEXT, 0.5), textTransform: 'none', minWidth: 0, px: 1 }}>
@@ -956,7 +1014,6 @@ export const PhoneNumbers = () => {
                 </Box>
             )}
 
-            {/* ── Filters ── */}
             <Box mb={2.5} display="flex" gap={1.5} alignItems="center">
                 <StyledTextField fullWidth placeholder="Search by phone number or country code…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                     InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, fontSize: '0.9rem', color: alpha(TEXT, 0.4) }} /> }}
@@ -965,13 +1022,18 @@ export const PhoneNumbers = () => {
                     <InputLabel sx={{ fontSize: '0.83rem' }}>Status</InputLabel>
                     <Select value={statusFilter} label="Status" onChange={e => { setStatusFilter(e.target.value); setPage(0); setGlobalSelectedRows([]); }} sx={{ fontSize: '0.83rem' }}>
                         <MenuItem value="all" sx={{ fontSize: '0.83rem' }}>All</MenuItem>
-                        <MenuItem value="active" sx={{ fontSize: '0.83rem' }}><Box display="flex" alignItems="center" gap={1}><CheckCircleIcon sx={{ fontSize: '0.85rem', color: GREEN }} /> Active</Box></MenuItem>
-                        <MenuItem value="inactive" sx={{ fontSize: '0.83rem' }}><Box display="flex" alignItems="center" gap={1}><BlockIcon sx={{ fontSize: '0.85rem', color: RED }} /> Inactive</Box></MenuItem>
+                        {STATUS_ENUM.map(status => (
+                            <MenuItem key={status} value={status} sx={{ fontSize: '0.83rem' }}>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                    {React.createElement(getStatusIcon(status), { sx: { fontSize: '0.85rem', color: STATUS_COLORS[status].color } })}
+                                    {getStatusLabel(status)}
+                                </Box>
+                            </MenuItem>
+                        ))}
                     </Select>
                 </FormControl>
             </Box>
 
-            {/* ── Main Table ── */}
             <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2, border: `1px solid ${theme.palette.divider}`, backgroundColor: theme.palette.background.paper, overflow: 'auto', mb: 3, position: 'relative', minHeight: 380 }}>
                 {isLoading && (
                     <Box position="absolute" top={0} left={0} right={0} bottom={0} display="flex" alignItems="center" justifyContent="center" bgcolor="rgba(255,255,255,0.7)" zIndex={1}>
@@ -1017,8 +1079,6 @@ export const PhoneNumbers = () => {
                                     onDeleteGroup={handleDeleteGroupClick}
                                     theme={theme}
                                     colors={colors}
-                                    getStatusStyle={getStatusStyle}
-                                    getStatusLabel={getStatusLabel}
                                     onSuccess={setSuccess}
                                     onError={setError}
                                 />
@@ -1039,19 +1099,32 @@ export const PhoneNumbers = () => {
                 />
             </TableContainer>
 
-            {/* ── Add / Edit Dialog ── */}
             <Dialog open={openDialog} onClose={() => { if (bulkUploadState) return; setOpenDialog(false); resetForm(); }} maxWidth="md" PaperProps={{ sx: { borderRadius: 2.5, height: '100%' } }}>
                 <DialogTitle sx={{ color: TEXT, fontWeight: 600, fontSize: '0.95rem', py: 2, px: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
                     {selectedNumber ? 'Edit Phone Number' : 'Add Phone Numbers'}
                 </DialogTitle>
                 <DialogContent sx={{ px: 3, py: 2.5 }}>
                     <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
-                        <Grid size={{ xs: 12, md: 6 }}>
+                        <Grid size={{ xs: 12, md: 12 }}>
                             <StyledTextField fullWidth label="Country Code" name="country_code" value={formData.country_code} onChange={handleInputChange} placeholder="+91" size="small" required />
                         </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                            <StyledTextField fullWidth label="Browser Reset" name="browser_reset_time" value={formData.browser_reset_time} onChange={handleInputChange} placeholder="Browser Reset Value" size="small" />
-                        </Grid>
+                        {selectedNumber && (
+                            <Grid size={{ xs: 12, md: 12 }}>
+                                <FormControl fullWidth size="small">
+                                    <InputLabel>Status</InputLabel>
+                                    <Select value={formData.is_active} label="Status" onChange={e => setFormData(prev => ({ ...prev, is_active: e.target.value }))} sx={{ fontSize: '0.83rem' }}>
+                                        {STATUS_ENUM.map(status => (
+                                            <MenuItem key={status} value={status} sx={{ fontSize: '0.83rem' }}>
+                                                <Box display="flex" alignItems="center" gap={1}>
+                                                    {React.createElement(getStatusIcon(status), { sx: { fontSize: '0.85rem', color: STATUS_COLORS[status].color } })}
+                                                    {getStatusLabel(status)}
+                                                </Box>
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Grid>
+                        )}
                         <Grid size={{ xs: 12 }}>
                             <FormControl fullWidth size="small">
                                 <InputLabel>Password Formatters</InputLabel>
@@ -1090,13 +1163,13 @@ export const PhoneNumbers = () => {
                         </Grid>
                         <Grid size={{ xs: 12 }}>
                             <StyledTextField fullWidth
-                                label={selectedNumber ? 'Phone Number' : bulkUploadState ? `Uploading… ${bulkUploadState.done}/${bulkUploadState.total}` : `Phone Numbers (one per line)${parsedCount > 0 ? ` — ${parsedCount} detected` : ''}`}
-                                name="numbers" value={formData.numbers} onChange={handleInputChange} disabled={!!bulkUploadState}
+                                label={selectedNumber ? 'Phone Number' : bulkCreateMutation.isLoading ? `Creating ${parsedCount} numbers...` : `Phone Numbers (one per line)${parsedCount > 0 ? ` — ${parsedCount} detected` : ''}`}
+                                name="numbers" value={formData.numbers} onChange={handleInputChange} disabled={bulkCreateMutation.isLoading}
                                 placeholder={selectedNumber ? '919026935664' : `919026935664\n919026935652\n919026033412`}
                                 multiline minRows={selectedNumber ? 1 : 5} maxRows={12} size="small"
                                 error={validationWarnings.length > 0 || duplicateNumbers.length > 0}
                                 required={!selectedNumber}
-                                helperText={!selectedNumber && !bulkUploadState && (
+                                helperText={!selectedNumber && !bulkCreateMutation.isLoading && (
                                     <>
                                         {duplicateNumbers.length > 0 && <span style={{ color: RED, display: 'block', marginBottom: '4px' }}>Duplicate numbers found: {duplicateNumbers.join(', ')}</span>}
                                         {validationWarnings.map((w, i) => <span key={i} style={{ color: RED, display: 'block' }}>{w}</span>)}
@@ -1106,70 +1179,60 @@ export const PhoneNumbers = () => {
                                 inputProps={{ style: { fontFamily: 'monospace', fontSize: '0.83rem' } }} />
                         </Grid>
 
-                        {!selectedNumber && !bulkUploadState && duplicateNumbers.length > 0 && (
+                        {!selectedNumber && !bulkCreateMutation.isLoading && duplicateNumbers.length > 0 && (
                             <Grid size={{ xs: 12 }}>
                                 <DuplicateNumbersWarning duplicates={duplicateNumbers} onRemoveAll={removeDuplicates} onKeepAll={() => setDuplicateNumbers([])} />
                             </Grid>
                         )}
 
-                        {!selectedNumber && bulkUploadState && (
+                        {bulkCreateMutation.isLoading && (
                             <Grid size={{ xs: 12 }}>
                                 <Box sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 1.5, p: 2, mt: 0.5 }}>
                                     <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-                                        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: TEXT }}>Uploading numbers…</Typography>
-                                        <Typography sx={{ fontSize: '0.75rem', color: alpha(TEXT, 0.5) }}>{bulkUploadState.done} / {bulkUploadState.total}</Typography>
+                                        <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: TEXT }}>Creating {parsedCount} numbers...</Typography>
+                                        <CircularProgress size={20} />
                                     </Box>
-                                    <LinearProgress variant="determinate" value={bulkUploadState.total > 0 ? (bulkUploadState.done / bulkUploadState.total) * 100 : 0}
-                                        sx={{ height: 6, borderRadius: 3, mb: 1.5, backgroundColor: alpha(BLUE, 0.12), '& .MuiLinearProgress-bar': { borderRadius: 3, backgroundColor: BLUE } }} />
+                                    <LinearProgress sx={{ height: 6, borderRadius: 3, backgroundColor: alpha(BLUE, 0.12), '& .MuiLinearProgress-bar': { borderRadius: 3, backgroundColor: BLUE } }} />
                                 </Box>
                             </Grid>
                         )}
 
-                        {!selectedNumber && !bulkUploadState && bulkUploadErrors.length > 0 && (
+                        {!selectedNumber && !bulkCreateMutation.isLoading && bulkUploadErrors.length > 0 && (
                             <Grid size={{ xs: 12 }}>
                                 <BulkUploadErrorDetails errors={bulkUploadErrors} onRetry={() => setBulkUploadErrors([])} onClear={() => { setBulkUploadErrors([]); setFormData(prev => ({ ...prev, numbers: '' })); }} />
-                            </Grid>
-                        )}
-
-                        {selectedNumber && (
-                            <Grid size={{ xs: 12 }}>
-                                <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 1.5, px: 2, py: 1.3 }}>
-                                    <Box>
-                                        <Typography sx={{ fontSize: '0.83rem', fontWeight: 500, color: TEXT }}>Active Status</Typography>
-                                        <Typography variant="caption" sx={{ fontSize: '0.73rem', color: alpha(TEXT, 0.5) }}>Toggle whether this phone number is active</Typography>
-                                    </Box>
-                                    <Chip label={formData.is_active ? 'Active' : 'Inactive'} size="small" variant="outlined"
-                                        icon={formData.is_active ? <CheckCircleIcon sx={{ fontSize: '0.72rem !important' }} /> : <BlockIcon sx={{ fontSize: '0.72rem !important' }} />}
-                                        onClick={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
-                                        sx={{ cursor: 'pointer', fontWeight: 500, fontSize: '0.72rem', height: 26, borderRadius: '6px', ...getStatusStyle(formData.is_active), '& .MuiChip-label': { px: 0.9 }, transition: 'all 0.15s ease' }} />
-                                </Box>
                             </Grid>
                         )}
                     </Grid>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}`, gap: 1 }}>
-                    <OutlineButton onClick={() => { setOpenDialog(false); resetForm(); }} size="medium" sx={{ fontSize: '0.82rem', px: 2 }} disabled={isMutating || !!bulkUploadState}>Cancel</OutlineButton>
+                    <OutlineButton onClick={() => { setOpenDialog(false); resetForm(); }} size="medium" sx={{ fontSize: '0.82rem', px: 2 }} disabled={isMutating}>Cancel</OutlineButton>
                     <GradientButton onClick={handleSubmit} variant="contained"
-                        disabled={!formData.country_code || !formData.numbers.trim() || isMutating || !!bulkUploadState || validationWarnings.length > 0 || duplicateNumbers.length > 0}
+                        disabled={!formData.country_code || !formData.numbers.trim() || isMutating || validationWarnings.length > 0 || duplicateNumbers.length > 0}
                         size="medium" sx={{ fontSize: '0.82rem', px: 2, minWidth: 120 }}>
-                        {bulkUploadState ? (
-                            <Box display="flex" alignItems="center" gap={1}><CircularProgress size={14} sx={{ color: 'white' }} /><span>Uploading…</span></Box>
+                        {bulkCreateMutation.isLoading ? (
+                            <Box display="flex" alignItems="center" gap={1}><CircularProgress size={14} sx={{ color: 'white' }} /><span>Creating...</span></Box>
                         ) : isMutating ? (
                             <CircularProgress size={16} sx={{ color: 'white' }} />
                         ) : selectedNumber ? 'Update'
-                          : bulkUploadErrors.length > 0 ? `Retry ${bulkUploadErrors.length} Failed`
-                          : parsedCount > 1 ? `Create ${parsedCount} Numbers`
-                          : 'Create'}
+                            : bulkUploadErrors.length > 0 ? `Retry ${bulkUploadErrors.length} Failed`
+                                : parsedCount > 1 ? `Create ${parsedCount} Numbers`
+                                    : 'Create'}
                     </GradientButton>
                 </DialogActions>
             </Dialog>
 
-            {/* ── Confirm dialog ── */}
             <ConfirmDialog
-                open={confirmDialog.open} onClose={closeConfirm} onConfirm={confirmDialog.onConfirm}
-                loading={confirmDialog.loading} title={confirmDialog.title} titleColor={confirmDialog.titleColor}
-                icon={confirmDialog.icon} message={confirmDialog.message} confirmLabel={confirmDialog.confirmLabel}
-                confirmColor={confirmDialog.confirmColor} confirmColorDark={confirmDialog.confirmColorDark}
+                open={confirmDialog.open}
+                onClose={closeConfirm}
+                onConfirm={confirmDialog.onConfirm}
+                loading={confirmDialog.loading}
+                title={confirmDialog.title}
+                titleColor={confirmDialog.titleColor}
+                iconComponent={confirmDialog.iconComponent}
+                message={confirmDialog.message}
+                confirmLabel={confirmDialog.confirmLabel}
+                confirmColor={confirmDialog.confirmColor}
+                confirmColorDark={confirmDialog.confirmColorDark}
             />
 
             <Snackbar open={!!success} autoHideDuration={3000} onClose={() => setSuccess('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>

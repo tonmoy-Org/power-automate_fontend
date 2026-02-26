@@ -15,8 +15,9 @@ import {
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
 import {
-  CheckCircle as CheckCircleIcon,
+  PlayArrow as PlayArrowIcon,
   Block as BlockIcon,
+  Done as DoneIcon,
   DownloadForOffline as DownloadAllIcon,
 } from '@mui/icons-material';
 import axiosInstance from '../../api/axios';
@@ -25,15 +26,17 @@ export const SuperAdminDashboard = () => {
   const theme = useTheme();
   const BLUE_COLOR = theme.palette.primary.main;
   const TEXT_PRIMARY = theme.palette.text.primary;
-  const GREEN_COLOR = theme.palette.success.main;
-  const RED_COLOR = theme.palette.error.main;
+  const INACTIVE_COLOR = '#6B7280';
+  const RUNNING_COLOR = theme.palette.primary.main;
+  const COMPLETED_COLOR = theme.palette.success.main;
   const WARNING_COLOR = theme.palette.warning.main;
   const GREY_COLOR = theme.palette.grey[500];
 
   const [counts, setCounts] = useState({
     phoneNumbers: 0,
-    phoneNumbersActive: 0,
     phoneNumbersInactive: 0,
+    phoneNumbersRunning: 0,
+    phoneNumbersCompleted: 0,
     passwordFormatters: 0,
     phoneCredentials: 0,
   });
@@ -55,13 +58,15 @@ export const SuperAdminDashboard = () => {
       ]);
 
       const phoneNumbersList = phoneNumbersRes.data?.data || [];
-      const activeCount = phoneNumbersList.filter((p) => p.is_active).length;
-      const inactiveCount = phoneNumbersList.filter((p) => !p.is_active).length;
+      const inactiveCount = phoneNumbersList.filter((p) => p.is_active === 'inactive').length;
+      const runningCount = phoneNumbersList.filter((p) => p.is_active === 'running').length;
+      const completedCount = phoneNumbersList.filter((p) => p.is_active === 'completed').length;
 
       setCounts({
         phoneNumbers: phoneNumbersRes.data?.pagination?.total || phoneNumbersList.length,
-        phoneNumbersActive: activeCount,
         phoneNumbersInactive: inactiveCount,
+        phoneNumbersRunning: runningCount,
+        phoneNumbersCompleted: completedCount,
         passwordFormatters: passwordFormattersRes.data?.data?.length || 0,
         phoneCredentials: phoneCredentialsRes.data?.length || 0,
       });
@@ -113,7 +118,8 @@ export const SuperAdminDashboard = () => {
 
   const glassCardSx = (color) => ({
     p: 2.5,
-    height: 140,
+    height: 'auto',
+    minHeight: 160,
     display: 'flex',
     flexDirection: 'column',
     border: `1px solid ${alpha(color, 0.2)}`,
@@ -125,6 +131,13 @@ export const SuperAdminDashboard = () => {
       background: `linear-gradient(135deg, ${alpha(color, 0.12)} 0%, ${alpha(color, 0.06)} 100%)`,
     },
   });
+
+  const statusItemSx = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 0.8,
+    py: 0.6,
+  };
 
   if (loading) {
     return (
@@ -168,21 +181,27 @@ export const SuperAdminDashboard = () => {
                 Total registered phone numbers
               </Typography>
             </Box>
-            <Box sx={{ mt: 'auto' }} display="flex" alignItems="flex-end" justifyContent="space-between">
+            <Box sx={{ mt: 'auto' }} display="flex" alignItems="flex-end" justifyContent="space-between" gap={2} flexWrap="wrap">
               <Typography variant="h3" component="div" color="primary.main" sx={{ fontWeight: 700, fontSize: '2rem', lineHeight: 1.2 }}>
                 {counts.phoneNumbers.toLocaleString()}
               </Typography>
               <Box display="flex" flexDirection="column" gap={0.4} alignItems="flex-end">
-                <Box display="flex" alignItems="center" gap={0.5}>
-                  <CheckCircleIcon sx={{ fontSize: '0.75rem', color: GREEN_COLOR }} />
-                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 500, color: GREEN_COLOR }}>
-                    {counts.phoneNumbersActive.toLocaleString()} Active
+                <Box sx={statusItemSx}>
+                  <BlockIcon sx={{ fontSize: '0.75rem', color: INACTIVE_COLOR }} />
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 500, color: INACTIVE_COLOR }}>
+                    {counts.phoneNumbersInactive.toLocaleString()} Inactive
                   </Typography>
                 </Box>
-                <Box display="flex" alignItems="center" gap={0.5}>
-                  <BlockIcon sx={{ fontSize: '0.75rem', color: RED_COLOR }} />
-                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 500, color: RED_COLOR }}>
-                    {counts.phoneNumbersInactive.toLocaleString()} Inactive
+                <Box sx={statusItemSx}>
+                  <PlayArrowIcon sx={{ fontSize: '0.75rem', color: RUNNING_COLOR }} />
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 500, color: RUNNING_COLOR }}>
+                    {counts.phoneNumbersRunning.toLocaleString()} Running
+                  </Typography>
+                </Box>
+                <Box sx={statusItemSx}>
+                  <DoneIcon sx={{ fontSize: '0.75rem', color: COMPLETED_COLOR }} />
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 500, color: COMPLETED_COLOR }}>
+                    {counts.phoneNumbersCompleted.toLocaleString()} Completed
                   </Typography>
                 </Box>
               </Box>
@@ -191,7 +210,7 @@ export const SuperAdminDashboard = () => {
         </Grid>
 
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-          <Paper elevation={0} sx={glassCardSx(GREEN_COLOR)}>
+          <Paper elevation={0} sx={glassCardSx(COMPLETED_COLOR)}>
             <Box sx={{ mb: 1 }}>
               <Typography variant="body1" color="success.main" sx={{ fontWeight: 600, fontSize: '0.9rem', mb: 0.5 }}>
                 Password Formatters
@@ -308,3 +327,5 @@ export const SuperAdminDashboard = () => {
     </Box>
   );
 };
+
+export default SuperAdminDashboard;
