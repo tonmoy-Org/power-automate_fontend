@@ -123,10 +123,10 @@ const getStatusIcon = (status) => STATUS_COLORS[status].icon;
 function ConfirmDialog({ open, onClose, onConfirm, loading, title, titleColor, iconComponent, message, confirmLabel, confirmColor, confirmColorDark }) {
     const theme = useTheme();
     const TEXT = theme.palette.text.primary;
-    
+
     // Handle iconComponent - it should be the constructor
     const IconComponent = iconComponent || DeleteIcon;
-    
+
     return (
         <Dialog open={open} onClose={!loading ? onClose : undefined} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
             <DialogTitle sx={{ color: titleColor, fontWeight: 600, fontSize: '0.95rem', py: 2, px: 3, borderBottom: `1px solid ${theme.palette.divider}` }}>
@@ -144,21 +144,21 @@ function ConfirmDialog({ open, onClose, onConfirm, loading, title, titleColor, i
                 <OutlineButton onClick={onClose} size="medium" sx={{ fontSize: '0.82rem', px: 2 }} disabled={loading}>
                     Cancel
                 </OutlineButton>
-                <Button 
-                    variant="contained" 
-                    onClick={onConfirm} 
+                <Button
+                    variant="contained"
+                    onClick={onConfirm}
                     disabled={loading}
                     startIcon={loading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <IconComponent sx={{ fontSize: '0.9rem' }} />}
-                    sx={{ 
-                        background: `linear-gradient(135deg, ${confirmColorDark} 0%, ${confirmColor} 100%)`, 
-                        color: 'white', 
-                        borderRadius: '8px', 
-                        px: 2, 
-                        fontWeight: 500, 
-                        fontSize: '0.82rem', 
-                        textTransform: 'none', 
-                        '&:hover': { filter: 'brightness(1.1)' }, 
-                        '&.Mui-disabled': { opacity: 0.65, color: 'white' } 
+                    sx={{
+                        background: `linear-gradient(135deg, ${confirmColorDark} 0%, ${confirmColor} 100%)`,
+                        color: 'white',
+                        borderRadius: '8px',
+                        px: 2,
+                        fontWeight: 500,
+                        fontSize: '0.82rem',
+                        textTransform: 'none',
+                        '&:hover': { filter: 'brightness(1.1)' },
+                        '&.Mui-disabled': { opacity: 0.65, color: 'white' }
                     }}>
                     {loading ? 'Processing…' : confirmLabel}
                 </Button>
@@ -471,7 +471,7 @@ function CountryCodeRow({
                                                 />
                                             </Tooltip>
                                         </TableCell>
-                                        {['Phone Number', 'Password Formatters', 'Status', 'Actions'].map((label, i) => (
+                                        {['Phone Number', 'Password Formatters', 'RDP ID', 'Status', 'Actions'].map((label, i) => (
                                             <TableCell key={label} align={i === 3 ? 'right' : 'left'}
                                                 sx={{ py: 0.9, fontSize: '0.78rem', fontWeight: 700, color: TEXT, borderBottom: `1px solid ${alpha(BLUE, 0.18)}`, pl: i === 0 ? 2 : undefined, pr: i === 3 ? 1.5 : undefined }}>
                                                 {label}
@@ -502,6 +502,9 @@ function CountryCodeRow({
                                                             : <Typography sx={{ fontSize: '0.73rem', color: alpha(TEXT, 0.35), fontStyle: 'italic' }}>No formatters</Typography>
                                                         }
                                                     </Box>
+                                                </TableCell>
+                                                <TableCell sx={{ ...cellSx, pl: 2 }}>
+                                                    <Typography sx={{ fontSize: '0.82rem', fontFamily: 'monospace', color: TEXT, letterSpacing: '0.02em' }}>{item.rdp_id ? item.rdp_id : '-'}</Typography>
                                                 </TableCell>
                                                 <TableCell sx={cellSx}>
                                                     <Chip label={getStatusLabel(item.is_active)} size="small" variant="outlined"
@@ -599,15 +602,15 @@ export const PhoneNumbers = () => {
     const [duplicateNumbers, setDuplicateNumbers] = useState([]);
 
     const CONFIRM_DEFAULT = {
-        open: false, 
-        loading: false, 
-        title: '', 
+        open: false,
+        loading: false,
+        title: '',
         titleColor: RED,
-        iconComponent: DeleteIcon, 
-        message: '', 
+        iconComponent: DeleteIcon,
+        message: '',
         confirmLabel: '',
-        confirmColor: RED, 
-        confirmColorDark: RED_DARK, 
+        confirmColor: RED,
+        confirmColorDark: RED_DARK,
         onConfirm: null,
     };
     const [confirmDialog, setConfirmDialog] = useState(CONFIRM_DEFAULT);
