@@ -27,6 +27,7 @@ import {
   Download as DownloadIcon,
   Delete as DeleteIcon,
   DownloadForOffline as DownloadAllIcon,
+  Info as InfoIcon,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "../../api/axios";
@@ -45,11 +46,22 @@ const fetchPhoneCredentials = async () => {
   return Array.isArray(raw) ? raw : (raw?.data ?? []);
 };
 
-// Optimized: Use single bulk delete endpoint instead of multiple individual deletes
 const bulkDeleteCredentials = async (ids) => {
   const response = await axiosInstance.delete("/phone-credentials/bulk", {
-    data: { ids }, // Send ids in request body
+    data: { ids },
   });
+  return response.data;
+};
+
+const deleteByTypeAndCountry = async ({ type, countryCode }) => {
+  const response = await axiosInstance.delete("/phone-credentials/by-type", {
+    data: { type, countryCode },
+  });
+  return response.data;
+};
+
+const deleteSingleCredential = async (id) => {
+  const response = await axiosInstance.delete(`/phone-credentials/${id}`);
   return response.data;
 };
 
@@ -73,14 +85,39 @@ const downloadTxtFile = (content, filename) => {
   URL.revokeObjectURL(url);
 };
 
-// Returns only raw "phone:password" lines — no headers or comments
+const copyToClipboard = async (text, successMessage, errorMessage) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return { success: true, message: successMessage };
+  } catch (err) {
+    console.error("Failed to copy:", err);
+    return { success: false, message: errorMessage };
+  }
+};
+
 const generateTypeContent = (credentials, type) =>
   credentials
     .filter((cred) => cred.type === type)
     .map((cred) => `${cred.phone}:${cred.password}`)
     .join("\n");
 
-// Joins all types as plain lines with no section headers
+const generateDetailedContent = (credentials) =>
+  credentials
+    .map((cred) => {
+      const url = cred.url || "N/A";
+      return `${cred.phone}:${cred.password}:${cred.type}:${url}`;
+    })
+    .join("\n");
+
+const generateDetailedTypeContent = (credentials, type) =>
+  credentials
+    .filter((cred) => cred.type === type)
+    .map((cred) => {
+      const url = cred.url || "N/A";
+      return `${cred.phone}:${cred.password}:${cred.type}:${url}`;
+    })
+    .join("\n");
+
 const generateAllContent = (credentials, types) =>
   types
     .map((type) => generateTypeContent(credentials, type))
@@ -99,12 +136,15 @@ export default function ValidPhoneNumber() {
   const WARNING_DARK = theme.palette.warning.dark;
   const TEXT_PRIMARY = theme.palette.text.primary;
   const GREY_COLOR = theme.palette.grey[500];
+  const INFO_COLOR = theme.palette.info.main;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteTypeTarget, setDeleteTypeTarget] = useState(null);
+  const [deleteSingleTarget, setDeleteSingleTarget] = useState(null);
 
   const {
     data: credentials = [],
@@ -117,20 +157,50 @@ export default function ValidPhoneNumber() {
     cacheTime: 0,
   });
 
-  // Optimized: Use bulk delete mutation
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteCredentials,
     onSuccess: (data) => {
       queryClient.invalidateQueries(["phoneCredentials"]);
       setSuccess(
         data.message ||
-          `All credentials for ${deleteTarget?.countryCode} deleted successfully`,
+        `All credentials for ${deleteTarget?.countryCode} deleted successfully`,
       );
       setDeleteTarget(null);
     },
     onError: (err) => {
       setError(err.response?.data?.message || "Failed to delete credentials");
       setDeleteTarget(null);
+    },
+  });
+
+  const deleteTypeMutation = useMutation({
+    mutationFn: deleteByTypeAndCountry,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(["phoneCredentials"]);
+      setSuccess(
+        data.message ||
+        `Type ${deleteTypeTarget?.type} credentials for ${deleteTypeTarget?.countryCode} deleted successfully`,
+      );
+      setDeleteTypeTarget(null);
+    },
+    onError: (err) => {
+      setError(
+        err.response?.data?.message || "Failed to delete type credentials",
+      );
+      setDeleteTypeTarget(null);
+    },
+  });
+
+  const deleteSingleMutation = useMutation({
+    mutationFn: deleteSingleCredential,
+    onSuccess: () => {
+      queryClient.invalidateQueries(["phoneCredentials"]);
+      setSuccess("Credential deleted successfully");
+      setDeleteSingleTarget(null);
+    },
+    onError: (err) => {
+      setError(err.response?.data?.message || "Failed to delete credential");
+      setDeleteSingleTarget(null);
     },
   });
 
@@ -148,19 +218,22 @@ export default function ValidPhoneNumber() {
     [credentials, uniqueTypes],
   );
 
-  const filteredAndGroupedCredentials = useMemo(() => {
-    let filtered = credentials;
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = credentials.filter(
-        (cred) =>
-          cred.country_code?.toLowerCase().includes(query) ||
-          cred.phone?.toLowerCase().includes(query) ||
-          cred.type?.toLowerCase().includes(query),
-      );
-    }
-    return groupByCountryCode(filtered);
+  const filteredCredentials = useMemo(() => {
+    if (!searchQuery.trim()) return credentials;
+    const query = searchQuery.toLowerCase();
+    return credentials.filter(
+      (cred) =>
+        cred.country_code?.toLowerCase().includes(query) ||
+        cred.phone?.toLowerCase().includes(query) ||
+        cred.type?.toLowerCase().includes(query) ||
+        (cred.url && cred.url.toLowerCase().includes(query)) ||
+        (cred.password && cred.password.toLowerCase().includes(query)),
+    );
   }, [credentials, searchQuery]);
+
+  const filteredAndGroupedCredentials = useMemo(() => {
+    return groupByCountryCode(filteredCredentials);
+  }, [filteredCredentials]);
 
   const allEntries = Object.entries(filteredAndGroupedCredentials);
   const totalPages = Math.ceil(allEntries.length / CARDS_PER_PAGE);
@@ -187,6 +260,48 @@ export default function ValidPhoneNumber() {
     setPage(1);
   };
 
+  const handleCopyUrl = async (url) => {
+    const result = await copyToClipboard(
+      url,
+      "URL copied to clipboard!",
+      "Failed to copy URL",
+    );
+    if (result.success) {
+      setSuccess(result.message);
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleCopyPhonePassword = async (credential) => {
+    const content = `${credential.phone}:${credential.password}`;
+    const result = await copyToClipboard(
+      content,
+      "Phone:Password copied to clipboard!",
+      "Failed to copy phone:password",
+    );
+    if (result.success) {
+      setSuccess(result.message);
+    } else {
+      setError(result.message);
+    }
+  };
+
+  const handleCopyDetailed = async (credential) => {
+    const url = credential.url || "N/A";
+    const content = `${credential.phone}:${credential.password}:${credential.type}:${url}`;
+    const result = await copyToClipboard(
+      content,
+      "Detailed credential copied to clipboard!",
+      "Failed to copy detailed credential",
+    );
+    if (result.success) {
+      setSuccess(result.message);
+    } else {
+      setError(result.message);
+    }
+  };
+
   const handleDownload = (countryCredentials, type) => {
     try {
       const content = generateTypeContent(countryCredentials, type);
@@ -198,6 +313,33 @@ export default function ValidPhoneNumber() {
       downloadTxtFile(content, `${countryCode}_type_${type}.txt`);
       setSuccess(
         `Downloaded Type ${type} credentials for Country Code: ${countryCode}`,
+      );
+    } catch {
+      setError("Failed to download file");
+    }
+  };
+
+  const handleDownloadDetailed = (countryCredentials, type = null) => {
+    try {
+      const countryCode = countryCredentials[0]?.country_code || "unknown";
+      let content;
+      let filename;
+
+      if (type) {
+        content = generateDetailedTypeContent(countryCredentials, type);
+        filename = `${countryCode}_type_${type}_detailed.txt`;
+      } else {
+        content = generateDetailedContent(countryCredentials);
+        filename = `${countryCode}_all_detailed.txt`;
+      }
+
+      if (!content) {
+        setError("No credentials to download");
+        return;
+      }
+      downloadTxtFile(content, filename);
+      setSuccess(
+        `Downloaded detailed credentials for Country Code: ${countryCode}${type ? ` (Type ${type})` : ""}`,
       );
     } catch {
       setError("Failed to download file");
@@ -250,13 +392,87 @@ export default function ValidPhoneNumber() {
     }
   };
 
+  const handleDownloadAllDetailed = () => {
+    try {
+      const content = generateDetailedContent(credentials);
+      if (!content) {
+        setError("No credentials to download");
+        return;
+      }
+      downloadTxtFile(
+        content,
+        `all_credentials_detailed_${new Date().toISOString().split("T")[0]}.txt`,
+      );
+      setSuccess(
+        `Downloaded all detailed credentials (${credentials.length} total)`,
+      );
+    } catch {
+      setError("Failed to download file");
+    }
+  };
+
+  const handleDownloadSingle = (credential) => {
+    try {
+      const content = `${credential.phone}:${credential.password}`;
+      downloadTxtFile(
+        content,
+        `${credential.country_code}_${credential.phone}_${credential.type}.txt`,
+      );
+      setSuccess(`Downloaded credential for ${credential.phone}`);
+    } catch {
+      setError("Failed to download file");
+    }
+  };
+
+  const handleDownloadSingleDetailed = (credential) => {
+    try {
+      const url = credential.url || "N/A";
+      const content = `${credential.phone}:${credential.password}:${credential.type}:${url}`;
+      downloadTxtFile(
+        content,
+        `${credential.country_code}_${credential.phone}_${credential.type}_detailed.txt`,
+      );
+      setSuccess(`Downloaded detailed credential for ${credential.phone}`);
+    } catch {
+      setError("Failed to download file");
+    }
+  };
+
   const handleDeleteCard = (countryCode, countryCredentials) => {
     const ids = countryCredentials.map((c) => c._id);
     setDeleteTarget({ countryCode, ids, count: ids.length });
   };
 
+  const handleDeleteType = (countryCode, type, typeCredentials) => {
+    setDeleteTypeTarget({
+      countryCode,
+      type,
+      count: typeCredentials.length,
+      ids: typeCredentials.map((c) => c._id),
+    });
+  };
+
+  const handleDeleteSingle = (credential) => {
+    setDeleteSingleTarget(credential);
+  };
+
   const handleDeleteConfirm = () => {
     if (deleteTarget) deleteMutation.mutate(deleteTarget.ids);
+  };
+
+  const handleDeleteTypeConfirm = () => {
+    if (deleteTypeTarget) {
+      deleteTypeMutation.mutate({
+        type: deleteTypeTarget.type,
+        countryCode: deleteTypeTarget.countryCode,
+      });
+    }
+  };
+
+  const handleDeleteSingleConfirm = () => {
+    if (deleteSingleTarget) {
+      deleteSingleMutation.mutate(deleteSingleTarget._id);
+    }
   };
 
   if (isLoading) {
@@ -313,7 +529,7 @@ export default function ValidPhoneNumber() {
 
       <Box mb={2.5}>
         <StyledTextField
-          placeholder="Search by Country Code, phone, or type…"
+          placeholder="Search by Country Code, phone, type, URL, or password…"
           value={searchQuery}
           onChange={handleSearch}
           size="small"
@@ -328,158 +544,177 @@ export default function ValidPhoneNumber() {
       </Box>
 
       {credentials.length > 0 && (
-        <Grid container spacing={1.5} sx={{ mb: 3 }}>
-          {typeSummary.map(({ type, count }) => {
-            const color = getTypeColor(count > 0);
-            const bg = getTypeBackground(count > 0);
-            const border = getTypeBorder(count > 0);
+        <>
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            {typeSummary.map(({ type, count }) => {
+              const color = getTypeColor(count > 0);
+              const bg = getTypeBackground(count > 0);
+              const border = getTypeBorder(count > 0);
 
-            return (
-              <Grid item xs="auto" key={type}>
-                <Card
-                  elevation={0}
-                  sx={{
-                    minWidth: 130,
-                    border: `1px solid ${border}`,
-                    borderRadius: 2,
-                    background: bg,
-                    transition: "box-shadow 0.2s",
-                    "&:hover": {
-                      boxShadow: `0 2px 10px ${alpha(color, 0.25)}`,
-                    },
-                  }}
-                >
-                  <CardContent
-                    sx={{ py: 1.25, px: 2, "&:last-child": { pb: 1.25 } }}
+              return (
+                <Grid item xs="auto" key={type}>
+                  <Card
+                    elevation={0}
+                    sx={{
+                      minWidth: 130,
+                      border: `1px solid ${border}`,
+                      borderRadius: 2,
+                      background: bg,
+                      transition: "box-shadow 0.2s",
+                      "&:hover": {
+                        boxShadow: `0 2px 10px ${alpha(color, 0.25)}`,
+                      },
+                    }}
                   >
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="space-between"
-                      gap={1.5}
+                    <CardContent
+                      sx={{ py: 1.25, px: 2, "&:last-child": { pb: 1.25 } }}
                     >
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Chip
-                          label={type}
-                          size="small"
-                          sx={{
-                            fontSize: "0.7rem",
-                            height: 22,
-                            backgroundColor: alpha(color, 0.15),
-                            color,
-                            border: `1px solid ${border}`,
-                            fontWeight: 700,
-                          }}
-                        />
-                        <Typography
-                          fontWeight={700}
-                          sx={{ fontSize: "1rem", color, lineHeight: 1 }}
-                        >
-                          {count}
-                        </Typography>
-                      </Box>
-
-                      <Tooltip title={`Download all Type ${type}`}>
-                        <span>
-                          <IconButton
+                      <Box
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        gap={1.5}
+                      >
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Chip
+                            label={type}
                             size="small"
-                            onClick={() => handleDownloadTypeAll(type)}
-                            disabled={count === 0}
                             sx={{
-                              color: count > 0 ? color : GREY_COLOR,
-                              p: 0.5,
-                              "&:hover": {
-                                backgroundColor: alpha(color, 0.15),
-                              },
+                              fontSize: "0.7rem",
+                              height: 22,
+                              backgroundColor: alpha(color, 0.15),
+                              color,
+                              border: `1px solid ${border}`,
+                              fontWeight: 700,
                             }}
+                          />
+                          <Typography
+                            fontWeight={700}
+                            sx={{ fontSize: "1rem", color, lineHeight: 1 }}
                           >
-                            <DownloadAllIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
-      )}
+                            {count}
+                          </Typography>
+                        </Box>
 
-      {credentials.length > 0 && (
-        <Box sx={{ mb: 3 }}>
-          <Card
-            elevation={0}
-            sx={{
-              background: `linear-gradient(135deg, ${alpha(GREEN_COLOR, 0.05)} 0%, ${alpha(BLUE_COLOR, 0.1)} 100%)`,
-              border: `1px solid ${alpha(WARNING_COLOR, 0.2)}`,
-              borderRadius: 2,
-            }}
-          >
-            <Box
-              sx={{ p: 2 }}
-              display="flex"
-              alignItems="center"
-              justifyContent="space-between"
+                        <Tooltip title={`Download all Type ${type}`}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDownloadTypeAll(type)}
+                              disabled={count === 0}
+                              sx={{
+                                color: count > 0 ? color : GREY_COLOR,
+                                p: 0.5,
+                                "&:hover": {
+                                  backgroundColor: alpha(color, 0.15),
+                                },
+                              }}
+                            >
+                              <DownloadAllIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+
+          <Box sx={{ mb: 3 }}>
+            <Card
+              elevation={0}
+              sx={{
+                background: `linear-gradient(135deg, ${alpha(GREEN_COLOR, 0.05)} 0%, ${alpha(BLUE_COLOR, 0.1)} 100%)`,
+                border: `1px solid ${alpha(WARNING_COLOR, 0.2)}`,
+                borderRadius: 2,
+              }}
             >
-              <Box display="flex" alignItems="center" gap={1.5}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    fontWeight: 600,
-                    color: WARNING_COLOR,
-                    fontSize: "0.85rem",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  All Valid Phone & Password
-                </Typography>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    backgroundColor: alpha(WARNING_COLOR, 0.1),
-                    borderRadius: 1.5,
-                    px: 1,
-                    py: 0.25,
-                  }}
-                >
+              <Box
+                sx={{ p: 2 }}
+                display="flex"
+                alignItems="center"
+                justifyContent="space-between"
+                flexWrap="wrap"
+                gap={1}
+              >
+                <Box display="flex" alignItems="center" gap={1.5}>
                   <Typography
-                    variant="caption"
-                    sx={{ color: alpha(TEXT_PRIMARY, 0.7) }}
+                    variant="subtitle2"
+                    sx={{
+                      fontWeight: 600,
+                      color: WARNING_COLOR,
+                      fontSize: "0.85rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.02em",
+                    }}
                   >
-                    Total:
+                    All Valid Phone & Password
                   </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{ fontWeight: 700, color: WARNING_COLOR }}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5,
+                      backgroundColor: alpha(WARNING_COLOR, 0.1),
+                      borderRadius: 1.5,
+                      px: 1,
+                      py: 0.25,
+                    }}
                   >
-                    {credentials.length}
-                  </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: alpha(TEXT_PRIMARY, 0.7) }}
+                    >
+                      Total:
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ fontWeight: 700, color: WARNING_COLOR }}
+                    >
+                      {credentials.length}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Tooltip title="Download all credentials (phone:password)">
+                    <IconButton
+                      size="small"
+                      onClick={handleDownloadAllCredentials}
+                      sx={{
+                        color: WARNING_COLOR,
+                        backgroundColor: alpha(WARNING_COLOR, 0.1),
+                        "&:hover": {
+                          backgroundColor: alpha(WARNING_COLOR, 0.2),
+                        },
+                      }}
+                    >
+                      <DownloadAllIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Download all credentials (detailed with type & URL)">
+                    <IconButton
+                      size="small"
+                      onClick={handleDownloadAllDetailed}
+                      sx={{
+                        color: INFO_COLOR,
+                        backgroundColor: alpha(INFO_COLOR, 0.1),
+                        "&:hover": { backgroundColor: alpha(INFO_COLOR, 0.2) },
+                      }}
+                    >
+                      <InfoIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Box>
-              <Tooltip title="Download all credentials">
-                <IconButton
-                  size="small"
-                  onClick={handleDownloadAllCredentials}
-                  sx={{
-                    color: WARNING_COLOR,
-                    backgroundColor: alpha(WARNING_COLOR, 0.1),
-                    "&:hover": { backgroundColor: alpha(WARNING_COLOR, 0.2) },
-                  }}
-                >
-                  <DownloadAllIcon sx={{ fontSize: 20 }} />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Card>
-        </Box>
+            </Card>
+          </Box>
+        </>
       )}
 
       {!hasData ? (
-        <Alert severity="info" sx={{ fontSize: "0.85rem" }}>
+        <Alert severity="info" sx={{ fontSize: "0.85rem", mb: 3 }}>
           {searchQuery
             ? "No credentials found matching your search."
             : "No credentials available."}
@@ -521,7 +756,7 @@ export default function ValidPhoneNumber() {
                       }
                       action={
                         <Box display="flex" alignItems="center" sx={{ ml: 5 }}>
-                          <Tooltip title="Download all credentials">
+                          <Tooltip title="Download all credentials (phone:password)">
                             <IconButton
                               size="small"
                               onClick={() =>
@@ -536,6 +771,23 @@ export default function ValidPhoneNumber() {
                               }}
                             >
                               <DownloadAllIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download all credentials (detailed with type & URL)">
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                handleDownloadDetailed(countryCredentials)
+                              }
+                              sx={{
+                                color: INFO_COLOR,
+                                p: 0.75,
+                                "&:hover": {
+                                  backgroundColor: alpha(INFO_COLOR, 0.1),
+                                },
+                              }}
+                            >
+                              <InfoIcon sx={{ fontSize: 18 }} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete all credentials for this Country Code">
@@ -584,6 +836,10 @@ export default function ValidPhoneNumber() {
                           const typeBg = getTypeBackground(true);
                           const typeBorder = getTypeBorder(true);
                           const typeCount = typeCredentials.length;
+                          const isDeletingType =
+                            deleteTypeMutation.isLoading &&
+                            deleteTypeTarget?.countryCode === countryCode &&
+                            deleteTypeTarget?.type === type;
 
                           return (
                             <Box key={type}>
@@ -598,6 +854,7 @@ export default function ValidPhoneNumber() {
                                   backgroundColor: alpha(typeColor, 0.05),
                                   border: `1px solid ${alpha(typeColor, 0.1)}`,
                                   my: 0.5,
+                                  opacity: isDeletingType ? 0.5 : 1,
                                 }}
                               >
                                 <Box display="flex" alignItems="center" gap={1}>
@@ -639,23 +896,93 @@ export default function ValidPhoneNumber() {
                                   </Box>
                                 </Box>
 
-                                <Tooltip title={`Download Type ${type}`}>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() =>
-                                      handleDownload(countryCredentials, type)
-                                    }
-                                    sx={{
-                                      color: typeColor,
-                                      p: 0.5,
-                                      "&:hover": {
-                                        backgroundColor: alpha(typeColor, 0.12),
-                                      },
-                                    }}
+                                <Box
+                                  display="flex"
+                                  alignItems="center"
+                                  gap={0.5}
+                                >
+                                  <Tooltip
+                                    title={`Download Type ${type} (phone:password)`}
                                   >
-                                    <DownloadIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        handleDownload(countryCredentials, type)
+                                      }
+                                      sx={{
+                                        color: typeColor,
+                                        p: 0.5,
+                                        "&:hover": {
+                                          backgroundColor: alpha(
+                                            typeColor,
+                                            0.12,
+                                          ),
+                                        },
+                                      }}
+                                    >
+                                      <DownloadIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip
+                                    title={`Download Type ${type} (detailed with URL)`}
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        handleDownloadDetailed(
+                                          countryCredentials,
+                                          type,
+                                        )
+                                      }
+                                      sx={{
+                                        color: INFO_COLOR,
+                                        p: 0.5,
+                                        "&:hover": {
+                                          backgroundColor: alpha(
+                                            INFO_COLOR,
+                                            0.12,
+                                          ),
+                                        },
+                                      }}
+                                    >
+                                      <InfoIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip
+                                    title={`Delete all Type ${type} credentials`}
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      onClick={() =>
+                                        handleDeleteType(
+                                          countryCode,
+                                          type,
+                                          typeCredentials,
+                                        )
+                                      }
+                                      disabled={deleteTypeMutation.isLoading}
+                                      sx={{
+                                        color: RED_COLOR,
+                                        p: 0.5,
+                                        "&:hover": {
+                                          backgroundColor: alpha(
+                                            RED_COLOR,
+                                            0.12,
+                                          ),
+                                        },
+                                      }}
+                                    >
+                                      {isDeletingType ? (
+                                        <CircularProgress
+                                          size={14}
+                                          sx={{ color: RED_COLOR }}
+                                        />
+                                      ) : (
+                                        <DeleteIcon sx={{ fontSize: 16 }} />
+                                      )}
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
                               </Box>
 
                               {index < arr.length - 1 && (
@@ -700,6 +1027,7 @@ export default function ValidPhoneNumber() {
         </>
       )}
 
+      {/* Delete All Dialog */}
       <Dialog
         open={!!deleteTarget}
         onClose={() => !deleteMutation.isLoading && setDeleteTarget(null)}
@@ -719,7 +1047,7 @@ export default function ValidPhoneNumber() {
         >
           <Box display="flex" alignItems="center" gap={1}>
             <DeleteIcon sx={{ fontSize: "1rem" }} />
-            Confirm Delete
+            Confirm Delete All
           </Box>
         </DialogTitle>
         <DialogContent sx={{ px: 3, py: 2.5 }}>
@@ -774,6 +1102,164 @@ export default function ValidPhoneNumber() {
             }}
           >
             {deleteMutation.isLoading ? "Deleting…" : "Delete All"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Type Dialog */}
+      <Dialog
+        open={!!deleteTypeTarget}
+        onClose={() =>
+          !deleteTypeMutation.isLoading && setDeleteTypeTarget(null)
+        }
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle
+          sx={{
+            color: RED_COLOR,
+            fontWeight: 700,
+            fontSize: "0.95rem",
+            py: 2,
+            px: 3,
+            borderBottom: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1}>
+            <DeleteIcon sx={{ fontSize: "1rem" }} />
+            Confirm Delete Type
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, py: 2.5 }}>
+          <DialogContentText sx={{ fontSize: "0.875rem", color: TEXT_PRIMARY }}>
+            Are you sure you want to delete all{" "}
+            <strong>
+              {deleteTypeTarget?.count} Type {deleteTypeTarget?.type} credential
+              {deleteTypeTarget?.count !== 1 ? "s" : ""}
+            </strong>{" "}
+            for <strong>Country Code {deleteTypeTarget?.countryCode}</strong>?
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            borderTop: `1px solid ${theme.palette.divider}`,
+            gap: 1,
+          }}
+        >
+          <OutlineButton
+            onClick={() => setDeleteTypeTarget(null)}
+            size="medium"
+            sx={{ fontSize: "0.85rem", px: 2 }}
+            disabled={deleteTypeMutation.isLoading}
+          >
+            Cancel
+          </OutlineButton>
+          <Button
+            variant="contained"
+            onClick={handleDeleteTypeConfirm}
+            disabled={deleteTypeMutation.isLoading}
+            startIcon={
+              deleteTypeMutation.isLoading ? (
+                <CircularProgress size={15} sx={{ color: "white" }} />
+              ) : (
+                <DeleteIcon sx={{ fontSize: "0.9rem" }} />
+              )
+            }
+            sx={{
+              background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
+              color: "white",
+              borderRadius: 1.5,
+              px: 2.5,
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              textTransform: "none",
+              "&:hover": {
+                background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)`,
+              },
+            }}
+          >
+            {deleteTypeMutation.isLoading ? "Deleting…" : "Delete Type"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Single Dialog */}
+      <Dialog
+        open={!!deleteSingleTarget}
+        onClose={() =>
+          !deleteSingleMutation.isLoading && setDeleteSingleTarget(null)
+        }
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle
+          sx={{
+            color: RED_COLOR,
+            fontWeight: 700,
+            fontSize: "0.95rem",
+            py: 2,
+            px: 3,
+            borderBottom: `1px solid ${theme.palette.divider}`,
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1}>
+            <DeleteIcon sx={{ fontSize: "1rem" }} />
+            Confirm Delete
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, py: 2.5 }}>
+          <DialogContentText sx={{ fontSize: "0.875rem", color: TEXT_PRIMARY }}>
+            Are you sure you want to delete credential for{" "}
+            <strong>{deleteSingleTarget?.phone}</strong> (Type:{" "}
+            {deleteSingleTarget?.type})? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            borderTop: `1px solid ${theme.palette.divider}`,
+            gap: 1,
+          }}
+        >
+          <OutlineButton
+            onClick={() => setDeleteSingleTarget(null)}
+            size="medium"
+            sx={{ fontSize: "0.85rem", px: 2 }}
+            disabled={deleteSingleMutation.isLoading}
+          >
+            Cancel
+          </OutlineButton>
+          <Button
+            variant="contained"
+            onClick={handleDeleteSingleConfirm}
+            disabled={deleteSingleMutation.isLoading}
+            startIcon={
+              deleteSingleMutation.isLoading ? (
+                <CircularProgress size={15} sx={{ color: "white" }} />
+              ) : (
+                <DeleteIcon sx={{ fontSize: "0.9rem" }} />
+              )
+            }
+            sx={{
+              background: `linear-gradient(135deg, ${RED_DARK} 0%, ${RED_COLOR} 100%)`,
+              color: "white",
+              borderRadius: 1.5,
+              px: 2.5,
+              fontWeight: 600,
+              fontSize: "0.85rem",
+              textTransform: "none",
+              "&:hover": {
+                background: `linear-gradient(135deg, ${RED_COLOR} 0%, #b91c1c 100%)`,
+              },
+            }}
+          >
+            {deleteSingleMutation.isLoading ? "Deleting…" : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>
