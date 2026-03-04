@@ -27,7 +27,6 @@ import {
   Download as DownloadIcon,
   Delete as DeleteIcon,
   DownloadForOffline as DownloadAllIcon,
-  Info as InfoIcon,
 } from "@mui/icons-material";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "../../api/axios";
@@ -136,7 +135,6 @@ export default function ValidPhoneNumber() {
   const WARNING_DARK = theme.palette.warning.dark;
   const TEXT_PRIMARY = theme.palette.text.primary;
   const GREY_COLOR = theme.palette.grey[500];
-  const INFO_COLOR = theme.palette.info.main;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [success, setSuccess] = useState("");
@@ -319,33 +317,6 @@ export default function ValidPhoneNumber() {
     }
   };
 
-  const handleDownloadDetailed = (countryCredentials, type = null) => {
-    try {
-      const countryCode = countryCredentials[0]?.country_code || "unknown";
-      let content;
-      let filename;
-
-      if (type) {
-        content = generateDetailedTypeContent(countryCredentials, type);
-        filename = `${countryCode}_type_${type}_detailed.txt`;
-      } else {
-        content = generateDetailedContent(countryCredentials);
-        filename = `${countryCode}_all_detailed.txt`;
-      }
-
-      if (!content) {
-        setError("No credentials to download");
-        return;
-      }
-      downloadTxtFile(content, filename);
-      setSuccess(
-        `Downloaded detailed credentials for Country Code: ${countryCode}${type ? ` (Type ${type})` : ""}`,
-      );
-    } catch {
-      setError("Failed to download file");
-    }
-  };
-
   const handleDownloadAll = (countryCredentials) => {
     try {
       const countryCode = countryCredentials[0]?.country_code || "unknown";
@@ -387,25 +358,6 @@ export default function ValidPhoneNumber() {
         `all_credentials_${new Date().toISOString().split("T")[0]}.txt`,
       );
       setSuccess(`Downloaded all credentials (${credentials.length} total)`);
-    } catch {
-      setError("Failed to download file");
-    }
-  };
-
-  const handleDownloadAllDetailed = () => {
-    try {
-      const content = generateDetailedContent(credentials);
-      if (!content) {
-        setError("No credentials to download");
-        return;
-      }
-      downloadTxtFile(
-        content,
-        `all_credentials_detailed_${new Date().toISOString().split("T")[0]}.txt`,
-      );
-      setSuccess(
-        `Downloaded all detailed credentials (${credentials.length} total)`,
-      );
     } catch {
       setError("Failed to download file");
     }
@@ -693,19 +645,6 @@ export default function ValidPhoneNumber() {
                       <DownloadAllIcon sx={{ fontSize: 20 }} />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Download all credentials (detailed with type & URL)">
-                    <IconButton
-                      size="small"
-                      onClick={handleDownloadAllDetailed}
-                      sx={{
-                        color: INFO_COLOR,
-                        backgroundColor: alpha(INFO_COLOR, 0.1),
-                        "&:hover": { backgroundColor: alpha(INFO_COLOR, 0.2) },
-                      }}
-                    >
-                      <InfoIcon sx={{ fontSize: 20 }} />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
               </Box>
             </Card>
@@ -771,23 +710,6 @@ export default function ValidPhoneNumber() {
                               }}
                             >
                               <DownloadAllIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Download all credentials (detailed with type & URL)">
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                handleDownloadDetailed(countryCredentials)
-                              }
-                              sx={{
-                                color: INFO_COLOR,
-                                p: 0.75,
-                                "&:hover": {
-                                  backgroundColor: alpha(INFO_COLOR, 0.1),
-                                },
-                              }}
-                            >
-                              <InfoIcon sx={{ fontSize: 18 }} />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete all credentials for this Country Code">
@@ -921,31 +843,6 @@ export default function ValidPhoneNumber() {
                                       }}
                                     >
                                       <DownloadIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip
-                                    title={`Download Type ${type} (detailed with URL)`}
-                                  >
-                                    <IconButton
-                                      size="small"
-                                      onClick={() =>
-                                        handleDownloadDetailed(
-                                          countryCredentials,
-                                          type,
-                                        )
-                                      }
-                                      sx={{
-                                        color: INFO_COLOR,
-                                        p: 0.5,
-                                        "&:hover": {
-                                          backgroundColor: alpha(
-                                            INFO_COLOR,
-                                            0.12,
-                                          ),
-                                        },
-                                      }}
-                                    >
-                                      <InfoIcon sx={{ fontSize: 16 }} />
                                     </IconButton>
                                   </Tooltip>
                                   <Tooltip
