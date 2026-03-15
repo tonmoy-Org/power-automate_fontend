@@ -1141,23 +1141,19 @@ function CountryCodeRow({
                                 letterSpacing: "0.02em",
                               }}
                             >
-                              {item.limit ? (
-                                <Chip
-                                  label={item.limit}
-                                  size="small"
-                                  sx={{
-                                    backgroundColor: alpha(BLUE, 0.1),
-                                    color: BLUE,
-                                    fontSize: "0.68rem",
-                                    height: 22,
-                                    borderRadius: "4px",
-                                    fontWeight: 600,
-                                    "& .MuiChip-label": { px: 0.8 },
-                                  }}
-                                />
-                              ) : (
-                                ""
-                              )}
+                              <Chip
+                                label={item.limit}
+                                size="small"
+                                sx={{
+                                  backgroundColor: alpha(BLUE, 0.1),
+                                  color: BLUE,
+                                  fontSize: "0.68rem",
+                                  height: 22,
+                                  borderRadius: "4px",
+                                  fontWeight: 600,
+                                  "& .MuiChip-label": { px: 0.8 },
+                                }}
+                              />
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ ...cellSx, pl: 2 }}>
@@ -1581,7 +1577,7 @@ export const PhoneNumbers = () => {
         password_formatter_ids:
           passwordFormatters.length > 0 ? getSelectedFormatterIds(number) : [],
         is_active: number.is_active || "inactive",
-        limit: number.limit || null,
+        limit: number.limit || 0,
         _pendingFormatters:
           passwordFormatters.length === 0 ? number.password_formatters : null,
       });
@@ -1740,7 +1736,7 @@ export const PhoneNumbers = () => {
           number: formData.numbers.trim(),
           password_formatters: selectedFormatters,
           is_active: formData.is_active,
-          limit: formData.limit ? parseInt(formData.limit) : null,
+          limit: formData.limit ? parseInt(formData.limit) : 0,
         },
       });
     } else {
@@ -1765,14 +1761,14 @@ export const PhoneNumbers = () => {
           country_code: formData.country_code,
           numbers: nums,
           password_formatters: selectedFormatters,
-          limit: formData.limit ? parseInt(formData.limit) : null,
+          limit: formData.limit ? parseInt(formData.limit) : 0,
         });
       } else {
         createMutation.mutate({
           country_code: formData.country_code,
           number: nums[0],
           password_formatters: selectedFormatters,
-          limit: formData.limit ? parseInt(formData.limit) : null,
+          limit: formData.limit ? parseInt(formData.limit) : 0,
         });
       }
     }
@@ -2199,7 +2195,7 @@ export const PhoneNumbers = () => {
                   label="Limit"
                   name="limit"
                   type="number"
-                  value={formData.limit || ""}
+                  value={formData.limit}
                   onChange={handleInputChange}
                   placeholder="e.g., 100"
                   size="small"
@@ -2214,9 +2210,9 @@ export const PhoneNumbers = () => {
                   label="Limit"
                   name="limit"
                   type="number"
-                  value={formData.limit || ""}
+                  value={formData.limit}
                   onChange={handleInputChange}
-                  placeholder="e.g., 100"
+                  placeholder="e.g., 100 (optional)"
                   size="small"
                   inputProps={{ min: 0 }}
                 />
