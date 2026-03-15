@@ -53,7 +53,6 @@ import {
   ExpandMore as ExpandMoreIcon,
   Warning as WarningIcon,
   PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon,
   Done as DoneIcon,
   Clear as ClearIcon,
 } from "@mui/icons-material";
@@ -81,6 +80,7 @@ const initialFormData = {
   numbers: "",
   password_formatter_ids: [],
   is_active: "inactive",
+  limit: 0,
 };
 
 const matchFormatterToMaster = (embedded, masters) =>
@@ -148,7 +148,6 @@ function ConfirmDialog({
   const theme = useTheme();
   const TEXT = theme.palette.text.primary;
 
-  // Handle iconComponent - it should be the constructor
   const IconComponent = iconComponent || DeleteIcon;
 
   return (
@@ -404,6 +403,28 @@ function BulkUploadErrorDetails({ errors, onRetry, onClear }) {
   );
 }
 
+function NoSearchResults({ searchQuery, debouncedInnerSearch, theme, TEXT }) {
+  return (
+    <Box sx={{ p: 3, textAlign: "center" }}>
+      <SearchIcon
+        sx={{
+          fontSize: 32,
+          color: alpha(TEXT, 0.15),
+          mb: 1.5,
+          display: "block",
+          mx: "auto",
+        }}
+      />
+      <Typography sx={{ fontSize: "0.8rem", color: alpha(TEXT, 0.4), mb: 0.5 }}>
+        No matches found
+      </Typography>
+      <Typography sx={{ fontSize: "0.7rem", color: alpha(TEXT, 0.25) }}>
+        "{debouncedInnerSearch || searchQuery}" didn't match any numbers
+      </Typography>
+    </Box>
+  );
+}
+
 function CountryCodeRow({
   group,
   globalSelectedRows,
@@ -429,7 +450,6 @@ function CountryCodeRow({
   const [innerSearchQuery, setInnerSearchQuery] = useState("");
   const [debouncedInnerSearch, setDebouncedInnerSearch] = useState("");
 
-  // Debounce inner search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedInnerSearch(innerSearchQuery);
@@ -440,16 +460,15 @@ function CountryCodeRow({
 
   const groupIds = group.items.map((i) => i._id);
 
-  // Filter items based on inner search
   const filteredItems = useMemo(() => {
     if (!debouncedInnerSearch) return group.items;
 
     const searchLower = debouncedInnerSearch.toLowerCase();
-    return group.items.filter(
-      (item) =>
-        item.number.toLowerCase().includes(searchLower) ||
-        (item.rdp_id && item.rdp_id.toLowerCase().includes(searchLower)),
-    );
+    return group.items.filter((item) => {
+      const numberMatch = item.number.toLowerCase().includes(searchLower);
+      const rdpMatch = item.rdp_id && item.rdp_id.toLowerCase() === searchLower;
+      return numberMatch || rdpMatch;
+    });
   }, [group.items, debouncedInnerSearch]);
 
   useEffect(() => {
@@ -1001,15 +1020,16 @@ function CountryCodeRow({
                       </Tooltip>
                     </TableCell>
                     {[
-                      "Phone Number",
+                      "Number",
                       "Password Formatters",
-                      "RDP ID",
+                      "Limit",
+                      "RDP ",
                       "Status",
                       "Actions",
                     ].map((label, i) => (
                       <TableCell
                         key={label}
-                        align={i === 3 ? "right" : "left"}
+                        align={i === 4 ? "right" : "left"}
                         sx={{
                           py: 0.9,
                           fontSize: "0.78rem",
@@ -1017,7 +1037,7 @@ function CountryCodeRow({
                           color: TEXT,
                           borderBottom: `1px solid ${alpha(BLUE, 0.18)}`,
                           pl: i === 0 ? 2 : undefined,
-                          pr: i === 3 ? 1.5 : undefined,
+                          pr: i === 4 ? 1.5 : undefined,
                         }}
                       >
                         {label}
@@ -1026,147 +1046,190 @@ function CountryCodeRow({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {pagedItems.map((item) => {
-                    const isInner = innerSelected.includes(item._id);
-                    return (
-                      <TableRow
-                        key={item._id}
-                        hover
-                        selected={isInner}
-                        sx={{
-                          transition: "background-color 0.15s ease",
-                          "&.Mui-selected": {
-                            backgroundColor: alpha(BLUE, 0.05),
-                          },
-                          "&.Mui-selected:hover": {
-                            backgroundColor: alpha(BLUE, 0.08),
-                          },
-                        }}
-                      >
-                        <TableCell
-                          padding="checkbox"
-                          sx={{ pl: 1.5, width: 48 }}
+                  {pagedItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ p: 3, textAlign: "center" }}>
+                        <NoSearchResults
+                          searchQuery=""
+                          debouncedInnerSearch={debouncedInnerSearch}
+                          theme={theme}
+                          TEXT={TEXT}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    pagedItems.map((item) => {
+                      const isInner = innerSelected.includes(item._id);
+                      return (
+                        <TableRow
+                          key={item._id}
+                          hover
+                          selected={isInner}
+                          sx={{
+                            transition: "background-color 0.15s ease",
+                            "&.Mui-selected": {
+                              backgroundColor: alpha(BLUE, 0.05),
+                            },
+                            "&.Mui-selected:hover": {
+                              backgroundColor: alpha(BLUE, 0.08),
+                            },
+                          }}
                         >
-                          <Checkbox
-                            size="small"
-                            checked={isInner}
-                            onChange={() => handleInnerSelectRow(item._id)}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ ...cellSx, pl: 2 }}>
-                          <Typography
-                            sx={{
-                              fontSize: "0.82rem",
-                              fontFamily: "monospace",
-                              color: TEXT,
-                              letterSpacing: "0.02em",
-                            }}
+                          <TableCell
+                            padding="checkbox"
+                            sx={{ pl: 1.5, width: 48 }}
                           >
-                            {item.number}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={cellSx}>
-                          <Box display="flex" gap={0.5} flexWrap="wrap">
-                            {item.password_formatters?.length > 0 ? (
-                              item.password_formatters.map((f) => (
-                                <Tooltip
-                                  key={f._id}
-                                  title={formatFormatterLabel(f)}
+                            <Checkbox
+                              size="small"
+                              checked={isInner}
+                              onChange={() => handleInnerSelectRow(item._id)}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, pl: 2 }}>
+                            <Typography
+                              sx={{
+                                fontSize: "0.82rem",
+                                fontFamily: "monospace",
+                                color: TEXT,
+                                letterSpacing: "0.02em",
+                              }}
+                            >
+                              {item.number}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={cellSx}>
+                            <Box display="flex" gap={0.5} flexWrap="wrap">
+                              {item.password_formatters?.length > 0 ? (
+                                item.password_formatters.map((f) => (
+                                  <Tooltip
+                                    key={f._id}
+                                    title={formatFormatterLabel(f)}
+                                  >
+                                    <Chip
+                                      label={formatFormatterLabel(f)}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor: alpha(GREEN, 0.1),
+                                        color: GREEN,
+                                        fontSize: "0.68rem",
+                                        height: 22,
+                                        borderRadius: "4px",
+                                        "& .MuiChip-label": { px: 0.8 },
+                                      }}
+                                    />
+                                  </Tooltip>
+                                ))
+                              ) : (
+                                <Typography
+                                  sx={{
+                                    fontSize: "0.73rem",
+                                    color: alpha(TEXT, 0.35),
+                                    fontStyle: "italic",
+                                  }}
                                 >
-                                  <Chip
-                                    label={formatFormatterLabel(f)}
-                                    size="small"
-                                    sx={{
-                                      backgroundColor: alpha(GREEN, 0.1),
-                                      color: GREEN,
-                                      fontSize: "0.68rem",
-                                      height: 22,
-                                      borderRadius: "4px",
-                                      "& .MuiChip-label": { px: 0.8 },
-                                    }}
-                                  />
-                                </Tooltip>
-                              ))
-                            ) : (
-                              <Typography
+                                  No formatters
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, pl: 2 }}>
+                            <Typography
+                              sx={{
+                                fontSize: "0.82rem",
+                                fontFamily: "monospace",
+                                color: TEXT,
+                                letterSpacing: "0.02em",
+                              }}
+                            >
+                              {item.limit ? (
+                                <Chip
+                                  label={item.limit}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: alpha(BLUE, 0.1),
+                                    color: BLUE,
+                                    fontSize: "0.68rem",
+                                    height: 22,
+                                    borderRadius: "4px",
+                                    fontWeight: 600,
+                                    "& .MuiChip-label": { px: 0.8 },
+                                  }}
+                                />
+                              ) : (
+                                ""
+                              )}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, pl: 2 }}>
+                            <Typography
+                              sx={{
+                                fontSize: "0.82rem",
+                                fontFamily: "monospace",
+                                color: TEXT,
+                                letterSpacing: "0.02em",
+                              }}
+                            >
+                              {item.rdp_id ? item.rdp_id : "-"}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={cellSx}>
+                            <Chip
+                              label={getStatusLabel(item.is_active)}
+                              size="small"
+                              variant="outlined"
+                              icon={React.createElement(
+                                getStatusIcon(item.is_active),
+                                { sx: { fontSize: "0.72rem !important" } },
+                              )}
+                              sx={{
+                                height: 22,
+                                borderRadius: "4px",
+                                fontWeight: 500,
+                                fontSize: "0.72rem",
+                                ...getStatusStyle(item.is_active),
+                                "& .MuiChip-label": { px: 0.8 },
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ ...cellSx, pr: 1.5 }}>
+                            <Tooltip title="Edit" placement="top">
+                              <IconButton
+                                size="small"
+                                onClick={() => onEdit(item)}
                                 sx={{
-                                  fontSize: "0.73rem",
-                                  color: alpha(TEXT, 0.35),
-                                  fontStyle: "italic",
+                                  color: BLUE,
+                                  mr: 0.3,
+                                  width: 28,
+                                  height: 28,
+                                  "&:hover": {
+                                    backgroundColor: alpha(BLUE, 0.1),
+                                  },
                                 }}
                               >
-                                No formatters
-                              </Typography>
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ ...cellSx, pl: 2 }}>
-                          <Typography
-                            sx={{
-                              fontSize: "0.82rem",
-                              fontFamily: "monospace",
-                              color: TEXT,
-                              letterSpacing: "0.02em",
-                            }}
-                          >
-                            {item.rdp_id ? item.rdp_id : "-"}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={cellSx}>
-                          <Chip
-                            label={getStatusLabel(item.is_active)}
-                            size="small"
-                            variant="outlined"
-                            icon={React.createElement(
-                              getStatusIcon(item.is_active),
-                              { sx: { fontSize: "0.72rem !important" } },
-                            )}
-                            sx={{
-                              height: 22,
-                              borderRadius: "4px",
-                              fontWeight: 500,
-                              fontSize: "0.72rem",
-                              ...getStatusStyle(item.is_active),
-                              "& .MuiChip-label": { px: 0.8 },
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="right" sx={{ ...cellSx, pr: 1.5 }}>
-                          <Tooltip title="Edit" placement="top">
-                            <IconButton
-                              size="small"
-                              onClick={() => onEdit(item)}
-                              sx={{
-                                color: BLUE,
-                                mr: 0.3,
-                                width: 28,
-                                height: 28,
-                                "&:hover": {
-                                  backgroundColor: alpha(BLUE, 0.1),
-                                },
-                              }}
-                            >
-                              <EditIcon sx={{ fontSize: "0.85rem" }} />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete" placement="top">
-                            <IconButton
-                              size="small"
-                              onClick={() => onDelete(item)}
-                              sx={{
-                                color: RED,
-                                width: 28,
-                                height: 28,
-                                "&:hover": { backgroundColor: alpha(RED, 0.1) },
-                              }}
-                            >
-                              <DeleteIcon sx={{ fontSize: "0.85rem" }} />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                                <EditIcon sx={{ fontSize: "0.85rem" }} />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete" placement="top">
+                              <IconButton
+                                size="small"
+                                onClick={() => onDelete(item)}
+                                sx={{
+                                  color: RED,
+                                  width: 28,
+                                  height: 28,
+                                  "&:hover": {
+                                    backgroundColor: alpha(RED, 0.1),
+                                  },
+                                }}
+                              >
+                                <DeleteIcon sx={{ fontSize: "0.85rem" }} />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
 
@@ -1205,16 +1268,6 @@ function CountryCodeRow({
                       },
                     }}
                   />
-                </Box>
-              )}
-
-              {filteredItems.length === 0 && (
-                <Box sx={{ p: 3, textAlign: "center" }}>
-                  <Typography
-                    sx={{ fontSize: "0.8rem", color: alpha(TEXT, 0.4) }}
-                  >
-                    No numbers match your search
-                  </Typography>
                 </Box>
               )}
             </Box>
@@ -1528,6 +1581,7 @@ export const PhoneNumbers = () => {
         password_formatter_ids:
           passwordFormatters.length > 0 ? getSelectedFormatterIds(number) : [],
         is_active: number.is_active || "inactive",
+        limit: number.limit || null,
         _pendingFormatters:
           passwordFormatters.length === 0 ? number.password_formatters : null,
       });
@@ -1686,6 +1740,7 @@ export const PhoneNumbers = () => {
           number: formData.numbers.trim(),
           password_formatters: selectedFormatters,
           is_active: formData.is_active,
+          limit: formData.limit ? parseInt(formData.limit) : null,
         },
       });
     } else {
@@ -1710,12 +1765,14 @@ export const PhoneNumbers = () => {
           country_code: formData.country_code,
           numbers: nums,
           password_formatters: selectedFormatters,
+          limit: formData.limit ? parseInt(formData.limit) : null,
         });
       } else {
         createMutation.mutate({
           country_code: formData.country_code,
           number: nums[0],
           password_formatters: selectedFormatters,
+          limit: formData.limit ? parseInt(formData.limit) : null,
         });
       }
     }
@@ -1882,7 +1939,7 @@ export const PhoneNumbers = () => {
       <Box mb={2.5} display="flex" gap={1.5} alignItems="center">
         <StyledTextField
           fullWidth
-          placeholder="Search..."
+          placeholder="Search by number, RDP ID or country code..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
@@ -1945,20 +2002,17 @@ export const PhoneNumbers = () => {
         }}
       >
         {isLoading && (
-          <Box
-            position="absolute"
-            top={0}
-            left={0}
-            right={0}
-            bottom={0}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            bgcolor="rgba(255,255,255,0.7)"
-            zIndex={1}
-          >
-            <CircularProgress />
-          </Box>
+          <LinearProgress
+            sx={{
+              borderRadius: "2px 2px 0 0",
+              height: 3,
+              backgroundColor: alpha(BLUE, 0.1),
+              "& .MuiLinearProgress-bar": {
+                backgroundColor: BLUE,
+                borderRadius: "2px",
+              },
+            }}
+          />
         )}
         <Table size="medium">
           <TableHead>
@@ -1997,17 +2051,6 @@ export const PhoneNumbers = () => {
                 }}
               >
                 Country Code
-                <Typography
-                  component="span"
-                  sx={{
-                    fontSize: "0.68rem",
-                    fontWeight: 400,
-                    color: alpha(TEXT, 0.4),
-                    ml: 1,
-                  }}
-                >
-                  — outer ☐ = global bulk · inner ☐ = row actions
-                </Typography>
               </TableCell>
               <TableCell
                 colSpan={5}
@@ -2033,7 +2076,7 @@ export const PhoneNumbers = () => {
                     sx={{ fontSize: "0.83rem", color: alpha(TEXT, 0.45) }}
                   >
                     {debouncedSearch || statusFilter !== "all"
-                      ? "No phone numbers found matching your filters"
+                      ? `No phone numbers found matching "${debouncedSearch || 'filters'}"`
                       : "No phone numbers yet. Add one to get started."}
                   </Typography>
                 </TableCell>
@@ -2100,7 +2143,7 @@ export const PhoneNumbers = () => {
           {selectedNumber ? "Edit Phone Number" : "Add Phone Numbers"}
         </DialogTitle>
         <DialogContent sx={{ px: 3, py: 2.5 }}>
-          <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
+          <Grid container spacing={2.5} sx={{ mt: 1.5 }}>
             <Grid size={{ xs: 12, md: 12 }}>
               <StyledTextField
                 fullWidth
@@ -2114,7 +2157,7 @@ export const PhoneNumbers = () => {
               />
             </Grid>
             {selectedNumber && (
-              <Grid size={{ xs: 12, md: 12 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Status</InputLabel>
                   <Select
@@ -2147,6 +2190,36 @@ export const PhoneNumbers = () => {
                     ))}
                   </Select>
                 </FormControl>
+              </Grid>
+            )}
+            {selectedNumber && (
+              <Grid size={{ xs: 12, md: 6 }}>
+                <StyledTextField
+                  fullWidth
+                  label="Limit"
+                  name="limit"
+                  type="number"
+                  value={formData.limit || ""}
+                  onChange={handleInputChange}
+                  placeholder="e.g., 100"
+                  size="small"
+                  inputProps={{ min: 0 }}
+                />
+              </Grid>
+            )}
+            {!selectedNumber && (
+              <Grid size={{ xs: 12 }}>
+                <StyledTextField
+                  fullWidth
+                  label="Limit"
+                  name="limit"
+                  type="number"
+                  value={formData.limit || ""}
+                  onChange={handleInputChange}
+                  placeholder="e.g., 100"
+                  size="small"
+                  inputProps={{ min: 0 }}
+                />
               </Grid>
             )}
             <Grid size={{ xs: 12 }}>
@@ -2207,7 +2280,7 @@ export const PhoneNumbers = () => {
                         indeterminate={
                           formData.password_formatter_ids.length > 0 &&
                           formData.password_formatter_ids.length <
-                            passwordFormatters.length
+                          passwordFormatters.length
                         }
                       />
                       <ListItemText
