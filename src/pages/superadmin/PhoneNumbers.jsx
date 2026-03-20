@@ -450,6 +450,7 @@ function CountryCodeRow({
   });
   const [innerSearchQuery, setInnerSearchQuery] = useState("");
   const [debouncedInnerSearch, setDebouncedInnerSearch] = useState("");
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -613,10 +614,12 @@ function CountryCodeRow({
           innerConfirmDialog.targetStatus,
         );
         setInnerSelected([]);
+        await queryClient.invalidateQueries(["phoneNumbers"]);
         onSuccess(result.message);
       } else if (innerConfirmDialog.type === "delete") {
         const result = await bulkDeletePhoneNumbers(innerSelected);
         setInnerSelected([]);
+        await queryClient.invalidateQueries(["phoneNumbers"]);
         onSuccess(result.message);
       }
       closeInnerConfirm();
@@ -624,8 +627,6 @@ function CountryCodeRow({
       const msg = error.response?.data?.message || "Operation failed";
       onError(msg);
       closeInnerConfirm();
-    } finally {
-      window.__queryClient?.invalidateQueries(["phoneNumbers"]);
     }
   };
 
@@ -1374,8 +1375,9 @@ export const PhoneNumbers = () => {
 
   const createMutation = useMutation({
     mutationFn: createPhoneNumber,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneNumbers"]);
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await refetch();
       setSuccess(data.message || "Phone number created successfully");
       setOpenDialog(false);
       resetForm();
@@ -1388,8 +1390,9 @@ export const PhoneNumbers = () => {
 
   const bulkCreateMutation = useMutation({
     mutationFn: bulkCreatePhoneNumbers,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneNumbers"]);
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await refetch();
       setSuccess(data.message);
       setOpenDialog(false);
       resetForm();
@@ -1412,8 +1415,9 @@ export const PhoneNumbers = () => {
 
   const updateMutation = useMutation({
     mutationFn: updatePhoneNumber,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneNumbers"]);
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await refetch();
       setSuccess(data.message || "Phone number updated successfully");
       setOpenDialog(false);
       resetForm();
@@ -1425,8 +1429,9 @@ export const PhoneNumbers = () => {
 
   const deleteMutation = useMutation({
     mutationFn: deletePhoneNumber,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneNumbers"]);
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await refetch();
       setSuccess(data.message || "Phone number deleted successfully");
       closeConfirm();
     },
@@ -1438,8 +1443,9 @@ export const PhoneNumbers = () => {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: bulkDeletePhoneNumbers,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneNumbers"]);
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await refetch();
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
@@ -1452,8 +1458,9 @@ export const PhoneNumbers = () => {
 
   const bulkStatusMutation = useMutation({
     mutationFn: ({ ids, status }) => bulkUpdatePhoneNumberStatus(ids, status),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneNumbers"]);
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await refetch();
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
