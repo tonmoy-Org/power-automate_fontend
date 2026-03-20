@@ -81,6 +81,7 @@ const initialFormData = {
   password_formatter_ids: [],
   is_active: "inactive",
   limit: 0,
+  rdp_id: "",
 };
 
 const matchFormatterToMaster = (embedded, masters) =>
@@ -1578,6 +1579,7 @@ export const PhoneNumbers = () => {
           passwordFormatters.length > 0 ? getSelectedFormatterIds(number) : [],
         is_active: number.is_active || "inactive",
         limit: number.limit || 0,
+        rdp_id: number.rdp_id || "",
         _pendingFormatters:
           passwordFormatters.length === 0 ? number.password_formatters : null,
       });
@@ -1737,6 +1739,7 @@ export const PhoneNumbers = () => {
           password_formatters: selectedFormatters,
           is_active: formData.is_active,
           limit: formData.limit ? parseInt(formData.limit) : 0,
+          rdp_id: formData.rdp_id.trim() || null,
         },
       });
     } else {
@@ -2215,6 +2218,20 @@ export const PhoneNumbers = () => {
                   placeholder="e.g., 100 (optional)"
                   size="small"
                   inputProps={{ min: 0 }}
+                />
+              </Grid>
+            )}
+            {selectedNumber && (
+              <Grid size={{ xs: 12 }}>
+                <StyledTextField
+                  fullWidth
+                  label="RDP ID"
+                  name="rdp_id"
+                  value={formData.rdp_id}
+                  onChange={handleInputChange}
+                  placeholder="e.g., rdp-12345"
+                  size="small"
+                  helperText="Optional: Assign an RDP ID to this phone number"
                 />
               </Grid>
             )}
