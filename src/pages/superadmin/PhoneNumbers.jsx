@@ -72,7 +72,6 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
 
-const MAX_NUMBERS_PER_UPLOAD = 1000;
 const INNER_PAGE_SIZE = 50;
 
 const initialFormData = {
@@ -80,7 +79,6 @@ const initialFormData = {
   numbers: "",
   password_formatter_ids: [],
   is_active: "inactive",
-  limit: 0,
   rdp_id: "",
 };
 
@@ -1024,14 +1022,13 @@ function CountryCodeRow({
                     {[
                       "Number",
                       "Password Formatters",
-                      "Limit",
-                      "RDP ",
+                      "RDP",
                       "Status",
                       "Actions",
                     ].map((label, i) => (
                       <TableCell
                         key={label}
-                        align={i === 4 ? "right" : "left"}
+                        align={i === 3 ? "right" : "left"}
                         sx={{
                           py: 0.9,
                           fontSize: "0.78rem",
@@ -1039,7 +1036,7 @@ function CountryCodeRow({
                           color: TEXT,
                           borderBottom: `1px solid ${alpha(BLUE, 0.18)}`,
                           pl: i === 0 ? 2 : undefined,
-                          pr: i === 4 ? 1.5 : undefined,
+                          pr: i === 3 ? 1.5 : undefined,
                         }}
                       >
                         {label}
@@ -1133,30 +1130,6 @@ function CountryCodeRow({
                                 </Typography>
                               )}
                             </Box>
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, pl: 2 }}>
-                            <Typography
-                              sx={{
-                                fontSize: "0.82rem",
-                                fontFamily: "monospace",
-                                color: TEXT,
-                                letterSpacing: "0.02em",
-                              }}
-                            >
-                              <Chip
-                                label={item.limit}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(BLUE, 0.1),
-                                  color: BLUE,
-                                  fontSize: "0.68rem",
-                                  height: 22,
-                                  borderRadius: "4px",
-                                  fontWeight: 600,
-                                  "& .MuiChip-label": { px: 0.8 },
-                                }}
-                              />
-                            </Typography>
                           </TableCell>
                           <TableCell sx={{ ...cellSx, pl: 2 }}>
                             <Typography
@@ -1303,7 +1276,6 @@ export const PhoneNumbers = () => {
   const RED = theme.palette.error.main;
   const RED_DARK = theme.palette.error.dark;
   const GREEN = theme.palette.success.main;
-  const GREEN_DARK = theme.palette.success.dark;
   const TEXT = theme.palette.text.primary;
   const colors = { BLUE, RED, GREEN, TEXT };
 
@@ -1585,7 +1557,6 @@ export const PhoneNumbers = () => {
         password_formatter_ids:
           passwordFormatters.length > 0 ? getSelectedFormatterIds(number) : [],
         is_active: number.is_active || "inactive",
-        limit: number.limit || 0,
         rdp_id: number.rdp_id || "",
         _pendingFormatters:
           passwordFormatters.length === 0 ? number.password_formatters : null,
@@ -1745,7 +1716,6 @@ export const PhoneNumbers = () => {
           number: formData.numbers.trim(),
           password_formatters: selectedFormatters,
           is_active: formData.is_active,
-          limit: formData.limit ? parseInt(formData.limit) : 0,
           rdp_id: formData.rdp_id.trim() || null,
         },
       });
@@ -1759,46 +1729,24 @@ export const PhoneNumbers = () => {
         setError(`Remove duplicates first: ${duplicateNumbers.join(", ")}`);
         return;
       }
-      if (nums.length > MAX_NUMBERS_PER_UPLOAD) {
-        setError(
-          `Max ${MAX_NUMBERS_PER_UPLOAD} numbers at once. You entered ${nums.length}.`,
-        );
-        return;
-      }
 
       if (nums.length > 1) {
         bulkCreateMutation.mutate({
           country_code: formData.country_code,
           numbers: nums,
           password_formatters: selectedFormatters,
-          limit: formData.limit ? parseInt(formData.limit) : 0,
         });
       } else {
         createMutation.mutate({
           country_code: formData.country_code,
           number: nums[0],
           password_formatters: selectedFormatters,
-          limit: formData.limit ? parseInt(formData.limit) : 0,
         });
       }
     }
   };
 
-  const validateNumbersInput = (numbers) => {
-    const nums = parseNumbers(numbers);
-    const warnings = [];
-    if (nums.length > MAX_NUMBERS_PER_UPLOAD)
-      warnings.push(
-        `Maximum ${MAX_NUMBERS_PER_UPLOAD} numbers allowed. You have ${nums.length}.`,
-      );
-    return { warnings };
-  };
-
   const parsedCount = parseNumbers(formData.numbers).length;
-  const { warnings: validationWarnings } =
-    !selectedNumber && formData.numbers
-      ? validateNumbersInput(formData.numbers)
-      : { warnings: [] };
 
   const isMutating =
     createMutation.isLoading ||
@@ -2150,7 +2098,7 @@ export const PhoneNumbers = () => {
         </DialogTitle>
         <DialogContent sx={{ px: 3, py: 2.5 }}>
           <Grid container spacing={2.5} sx={{ mt: 1.5 }}>
-            <Grid size={{ xs: 12, md: 12 }}>
+            <Grid size={{ xs: 12 }}>
               <StyledTextField
                 fullWidth
                 label="Country Code"
@@ -2200,36 +2148,6 @@ export const PhoneNumbers = () => {
             )}
             {selectedNumber && (
               <Grid size={{ xs: 12, md: 6 }}>
-                <StyledTextField
-                  fullWidth
-                  label="Limit"
-                  name="limit"
-                  type="number"
-                  value={formData.limit}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 100"
-                  size="small"
-                  inputProps={{ min: 0 }}
-                />
-              </Grid>
-            )}
-            {!selectedNumber && (
-              <Grid size={{ xs: 12 }}>
-                <StyledTextField
-                  fullWidth
-                  label="Limit"
-                  name="limit"
-                  type="number"
-                  value={formData.limit}
-                  onChange={handleInputChange}
-                  placeholder="e.g., 100 (optional)"
-                  size="small"
-                  inputProps={{ min: 0 }}
-                />
-              </Grid>
-            )}
-            {selectedNumber && (
-              <Grid size={{ xs: 12 }}>
                 <StyledTextField
                   fullWidth
                   label="RDP ID"
@@ -2300,7 +2218,7 @@ export const PhoneNumbers = () => {
                         indeterminate={
                           formData.password_formatter_ids.length > 0 &&
                           formData.password_formatter_ids.length <
-                          passwordFormatters.length
+                            passwordFormatters.length
                         }
                       />
                       <ListItemText
@@ -2362,13 +2280,10 @@ export const PhoneNumbers = () => {
                 minRows={selectedNumber ? 1 : 5}
                 maxRows={12}
                 size="small"
-                error={
-                  validationWarnings.length > 0 || duplicateNumbers.length > 0
-                }
+                error={duplicateNumbers.length > 0}
                 required={!selectedNumber}
                 helperText={
-                  !selectedNumber &&
-                  !bulkCreateMutation.isLoading && (
+                  !selectedNumber && !bulkCreateMutation.isLoading ? (
                     <>
                       {duplicateNumbers.length > 0 && (
                         <span
@@ -2381,21 +2296,14 @@ export const PhoneNumbers = () => {
                           Duplicate numbers found: {duplicateNumbers.join(", ")}
                         </span>
                       )}
-                      {validationWarnings.map((w, i) => (
-                        <span key={i} style={{ color: RED, display: "block" }}>
-                          {w}
+                      {parsedCount > 0 && duplicateNumbers.length === 0 && (
+                        <span style={{ color: GREEN, display: "block" }}>
+                          ✓ Ready to upload {parsedCount} number
+                          {parsedCount > 1 ? "s" : ""}
                         </span>
-                      ))}
-                      {parsedCount > 0 &&
-                        parsedCount <= MAX_NUMBERS_PER_UPLOAD &&
-                        duplicateNumbers.length === 0 && (
-                          <span style={{ color: GREEN, display: "block" }}>
-                            ✓ Ready to upload {parsedCount} number
-                            {parsedCount > 1 ? "s" : ""}
-                          </span>
-                        )}
+                      )}
                     </>
-                  )
+                  ) : null
                 }
                 inputProps={{
                   style: { fontFamily: "monospace", fontSize: "0.83rem" },
@@ -2495,7 +2403,6 @@ export const PhoneNumbers = () => {
               !formData.country_code ||
               !formData.numbers.trim() ||
               isMutating ||
-              validationWarnings.length > 0 ||
               duplicateNumbers.length > 0
             }
             size="medium"
