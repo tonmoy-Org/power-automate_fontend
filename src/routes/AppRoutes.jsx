@@ -6,20 +6,11 @@ import { PrivateRoute } from '../auth/PrivateRoute';
 import { ErrorPage } from '../pages/error/ErrorPage';
 
 import { SuperAdminLayout } from '../pages/superadmin/components/SuperAdminLayout';
-import { MemberLayout } from '../pages/member/components/MemberLayout';
-import { ClientLayout } from '../pages/client/components/ClientLayout';
 
 import { SuperAdminDashboard } from '../pages/superadmin/SuperAdminDashboard';
 import { SuperAdminProfile } from '../pages/superadmin/Profile';
 import { UserManagement } from '../pages/superadmin/UserManagement';
 
-
-import { MemberDashboard } from '../pages/member/MemberDashboard';
-import { MemberProfile } from '../pages/member/Profile';
-
-
-import { ClientDashboard } from '../pages/client/ClientDashboard';
-import { ClientProfile } from '../pages/client/Profile';
 import ForgotPassword from '../pages/forgot-password/ForgotPassword';
 import ResetPassword from '../pages/reset-password/ResetPassword';
 import PhoneNumbers from '../pages/superadmin/PhoneNumbers';
@@ -75,33 +66,6 @@ export const AppRoutes = () => {
           <Route path="valid-phone-password" element={<ValidPhoneNumber />} />
           <Route path="profile" element={<SuperAdminProfile />} />
         </Route>
-
-        {/* Member Routes */}
-        <Route
-          path="/member-dashboard"
-          element={
-            <PrivateRoute requiredRoles={['member']}>
-              <MemberLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<MemberDashboard />} />
-          <Route path="profile" element={<MemberProfile />} />
-        </Route>
-
-        {/* Tech Routes */}
-        <Route
-          path="/client-dashboard"
-          element={
-            <PrivateRoute requiredRoles={['client']}>
-              <ClientLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<ClientDashboard />} />
-          <Route path="profile" element={<ClientProfile />} />
-        </Route>
-
         {/* Fallback Routes */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
