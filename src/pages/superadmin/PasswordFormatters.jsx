@@ -26,6 +26,9 @@ import {
     Button,
     CircularProgress,
     Collapse,
+    Autocomplete,
+    TextField,
+    LinearProgress,
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -62,6 +65,11 @@ const deletePasswordFormatter = async (id) => {
     return response.data;
 };
 
+const bulkCreatePasswordFormatters = async (items) => {
+    const response = await axiosInstance.post('/password-formatters/bulk', { items });
+    return response.data;
+};
+
 const bulkDeletePasswordFormatters = async (ids) => {
     const response = await axiosInstance.delete('/password-formatters/bulk', { data: { ids } });
     return response.data;
@@ -74,6 +82,8 @@ const initialFormData = {
     end_add: '',
     country_code: ''
 };
+
+const initialRowData = { start_add: '', start_index: '', end_index: '', end_add: '' };
 
 export const PasswordFormatters = () => {
     const theme = useTheme();
@@ -92,19 +102,23 @@ export const PasswordFormatters = () => {
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [outerPage, setOuterPage] = useState(0);
+    const [rowsPerPage] = useState(10);
     const [countryFilter, setCountryFilter] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [debouncedCountry, setDebouncedCountry] = useState('');
     const [formData, setFormData] = useState(initialFormData);
     const [selectedRows, setSelectedRows] = useState([]);
+    // Bulk-add state
+    const [dialogCountryCode, setDialogCountryCode] = useState('');
+    const [currentRow, setCurrentRow] = useState(initialRowData);
+    const [pendingRows, setPendingRows] = useState([]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearch(searchQuery);
             setDebouncedCountry(countryFilter);
-            setPage(0);
+            setOuterPage(0);
         }, 500);
         return () => clearTimeout(timer);
     }, [searchQuery, countryFilter]);
@@ -116,12 +130,12 @@ export const PasswordFormatters = () => {
         error: queryError,
         refetch
     } = useQuery({
-        queryKey: ['passwordFormatters', page, rowsPerPage, debouncedSearch, debouncedCountry],
+        queryKey: ['passwordFormatters', debouncedSearch, debouncedCountry],
         queryFn: async ({ queryKey }) => {
-            const [, page, limit, search, country_code] = queryKey;
+            const [, search, country_code] = queryKey;
             const params = new URLSearchParams({
-                page: page + 1,
-                limit,
+                page: 1,
+                limit: 9999, // fetch all, paginate groups client-side
                 search: search || '',
                 country_code: country_code || ''
             });
@@ -141,6 +155,19 @@ export const PasswordFormatters = () => {
         },
         onError: (error) => {
             setError(error.response?.data?.message || 'Failed to create password formatter');
+        }
+    });
+
+    const bulkCreateMutation = useMutation({
+        mutationFn: bulkCreatePasswordFormatters,
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['passwordFormatters']);
+            setSuccess(data.message || 'Formatters created successfully');
+            setOpenDialog(false);
+            resetForm();
+        },
+        onError: (error) => {
+            setError(error.response?.data?.message || 'Failed to create formatters');
         }
     });
 
@@ -236,16 +263,35 @@ export const PasswordFormatters = () => {
         return a.localeCompare(b);
     }), [groupedFormatters]);
 
-    const handleChangePage = (event, newPage) => setPage(newPage);
+    // Paginate the groups (10 groups per outer page)
+    const pagedGroupKeys = useMemo(() =>
+        sortedGroupKeys.slice(outerPage * rowsPerPage, (outerPage + 1) * rowsPerPage)
+    , [sortedGroupKeys, outerPage, rowsPerPage]);
 
-    const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0);
-    };
+    const handleChangePage = (event, newPage) => setOuterPage(newPage);
+    const handleChangeRowsPerPage = () => {}; // fixed at 10 groups
 
     const resetForm = () => {
         setFormData(initialFormData);
         setSelectedFormatter(null);
+        setDialogCountryCode('');
+        setCurrentRow(initialRowData);
+        setPendingRows([]);
+    };
+
+    // Existing country codes for autocomplete
+    const existingCountryCodes = useMemo(() =>
+        [...new Set(allFormatters.map(f => f.country_code).filter(Boolean))].sort()
+    , [allFormatters]);
+
+    const handleAddRow = () => {
+        if (!currentRow.start_add && !currentRow.end_add) return;
+        setPendingRows(prev => [...prev, { ...currentRow }]);
+        setCurrentRow(initialRowData);
+    };
+
+    const handleRemovePendingRow = (idx) => {
+        setPendingRows(prev => prev.filter((_, i) => i !== idx));
     };
 
     const handleInputChange = (e) => {
@@ -276,18 +322,33 @@ export const PasswordFormatters = () => {
     };
 
     const handleSubmit = () => {
-        const apiData = {
-            start_add: formData.start_add,
-            start_index: formData.start_index === '' ? undefined : Number(formData.start_index),
-            end_index: formData.end_index === '' ? undefined : Number(formData.end_index),
-            end_add: formData.end_add,
-            country_code: formData.country_code
-        };
-
         if (selectedFormatter) {
+            // Edit mode — single update
+            const apiData = {
+                start_add: formData.start_add,
+                start_index: formData.start_index === '' ? undefined : Number(formData.start_index),
+                end_index: formData.end_index === '' ? undefined : Number(formData.end_index),
+                end_add: formData.end_add,
+                country_code: formData.country_code
+            };
             updateMutation.mutate({ id: selectedFormatter._id, data: apiData });
         } else {
-            createMutation.mutate(apiData);
+            // Bulk-add mode — save all pending rows
+            const allRows = pendingRows.length > 0
+                ? pendingRows
+                : [currentRow]; // allow saving current row even if not explicitly added
+            const items = allRows.map(r => ({
+                start_add: r.start_add,
+                start_index: r.start_index === '' ? undefined : Number(r.start_index),
+                end_index: r.end_index === '' ? undefined : Number(r.end_index),
+                end_add: r.end_add,
+                country_code: dialogCountryCode
+            }));
+            if (items.length === 1) {
+                createMutation.mutate(items[0]);
+            } else {
+                bulkCreateMutation.mutate(items);
+            }
         }
     };
 
@@ -333,7 +394,12 @@ export const PasswordFormatters = () => {
         handleSelectRow,
         handleSelectGroup,
     }) => {
+        const INNER_PAGE_SIZE = 30;
         const [open, setOpen] = useState(false);
+        const [innerPage, setInnerPage] = useState(0);
+
+        const pagedItems = items.slice(innerPage * INNER_PAGE_SIZE, (innerPage + 1) * INNER_PAGE_SIZE);
+        const totalInnerPages = Math.ceil(items.length / INNER_PAGE_SIZE);
 
         return (
             <>
@@ -412,98 +478,136 @@ export const PasswordFormatters = () => {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {items.map((formatter, idx) => (
-                                            <TableRow
-                                                key={formatter._id}
-                                                hover
-                                                sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
-                                            >
-                                                <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={selectedRows.includes(formatter._id)}
-                                                        onChange={() => handleSelectRow(formatter._id)}
-                                                        sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
-                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                                        {idx + 1}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Chip
-                                                        label={formatter.start_add ?? '—'}
-                                                        size="small"
-                                                        sx={{
-                                                            backgroundColor: alpha(GREEN_COLOR, 0.08),
-                                                            color: GREEN_DARK,
-                                                            fontWeight: 500,
-                                                            fontSize: '0.7rem',
-                                                            height: 20,
-                                                            fontFamily: 'monospace',
-                                                        }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                                        {formatter.start_index ?? '—'}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                                        {formatter.end_index ?? '—'}
-                                                    </Typography>
-                                                </TableCell>
-                                                <TableCell sx={{ py: 1 }}>
-                                                    <Chip
-                                                        label={formatter.end_add ?? '—'}
-                                                        size="small"
-                                                        sx={{
-                                                            backgroundColor: alpha(GREEN_COLOR, 0.08),
-                                                            color: GREEN_DARK,
-                                                            fontWeight: 500,
-                                                            fontSize: '0.7rem',
-                                                            height: 20,
-                                                            fontFamily: 'monospace',
-                                                        }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell align="right" sx={{ py: 1 }}>
-                                                    <Box display="flex" justifyContent="flex-end">
-                                                        <Tooltip title="Copy formatter">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => { e.stopPropagation(); onCopy(formatter); }}
-                                                                sx={{ color: GREEN_COLOR, p: 0.5 }}
-                                                            >
-                                                                <CopyIcon sx={{ fontSize: '1rem' }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                        <Tooltip title="Edit formatter">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => { e.stopPropagation(); onEdit(formatter); }}
-                                                                sx={{ color: GREEN_COLOR, p: 0.5 }}
-                                                            >
-                                                                <EditIcon sx={{ fontSize: '1rem' }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                        <Tooltip title="Delete formatter">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => { e.stopPropagation(); onDelete(formatter); }}
-                                                                sx={{ color: RED_COLOR, p: 0.5 }}
-                                                            >
-                                                                <DeleteIcon sx={{ fontSize: '1rem' }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-                                                    </Box>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {pagedItems.map((formatter, idx) => {
+                                            const serialNumber = innerPage * INNER_PAGE_SIZE + idx + 1;
+                                            return (
+                                                <TableRow
+                                                    key={formatter._id}
+                                                    hover
+                                                    sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
+                                                >
+                                                    <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={selectedRows.includes(formatter._id)}
+                                                            onChange={() => handleSelectRow(formatter._id)}
+                                                            sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                                            {serialNumber}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Chip
+                                                            label={formatter.start_add ?? '—'}
+                                                            size="small"
+                                                            sx={{
+                                                                backgroundColor: alpha(GREEN_COLOR, 0.08),
+                                                                color: GREEN_DARK,
+                                                                fontWeight: 500,
+                                                                fontSize: '0.7rem',
+                                                                height: 20,
+                                                                fontFamily: 'monospace',
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                            {formatter.start_index ?? '—'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                            {formatter.end_index ?? '—'}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 1 }}>
+                                                        <Chip
+                                                            label={formatter.end_add ?? '—'}
+                                                            size="small"
+                                                            sx={{
+                                                                backgroundColor: alpha(GREEN_COLOR, 0.08),
+                                                                color: GREEN_DARK,
+                                                                fontWeight: 500,
+                                                                fontSize: '0.7rem',
+                                                                height: 20,
+                                                                fontFamily: 'monospace',
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ py: 1 }}>
+                                                        <Box display="flex" justifyContent="flex-end">
+                                                            <Tooltip title="Copy formatter">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={(e) => { e.stopPropagation(); onCopy(formatter); }}
+                                                                    sx={{ color: GREEN_COLOR, p: 0.5 }}
+                                                                >
+                                                                    <CopyIcon sx={{ fontSize: '1rem' }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                            <Tooltip title="Edit formatter">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={(e) => { e.stopPropagation(); onEdit(formatter); }}
+                                                                    sx={{ color: GREEN_COLOR, p: 0.5 }}
+                                                                >
+                                                                    <EditIcon sx={{ fontSize: '1rem' }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                            <Tooltip title="Delete formatter">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={(e) => { e.stopPropagation(); onDelete(formatter); }}
+                                                                    sx={{ color: RED_COLOR, p: 0.5 }}
+                                                                >
+                                                                    <DeleteIcon sx={{ fontSize: '1rem' }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+                                                        </Box>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
+
+                                {totalInnerPages > 1 && (
+                                    <Box
+                                        display="flex"
+                                        alignItems="center"
+                                        justifyContent="flex-end"
+                                        gap={1}
+                                        px={2}
+                                        py={0.8}
+                                        sx={{ borderTop: `1px solid ${alpha(GREEN_COLOR, 0.12)}` }}
+                                    >
+                                        <Typography sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.55) }}>
+                                            {innerPage * INNER_PAGE_SIZE + 1}–{Math.min((innerPage + 1) * INNER_PAGE_SIZE, items.length)} of {items.length}
+                                        </Typography>
+                                        <IconButton
+                                            size="small"
+                                            disabled={innerPage === 0}
+                                            onClick={() => setInnerPage(p => p - 1)}
+                                            sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}
+                                        >
+                                            <KeyboardArrowUpIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
+                                        </IconButton>
+                                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: TEXT_PRIMARY }}>
+                                            {innerPage + 1} / {totalInnerPages}
+                                        </Typography>
+                                        <IconButton
+                                            size="small"
+                                            disabled={innerPage >= totalInnerPages - 1}
+                                            onClick={() => setInnerPage(p => p + 1)}
+                                            sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}
+                                        >
+                                            <KeyboardArrowDownIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
+                                        </IconButton>
+                                    </Box>
+                                )}
                             </Box>
                         </Collapse>
                     </TableCell>
@@ -679,22 +783,16 @@ export const PasswordFormatters = () => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            sortedGroupKeys.map((countryCode) => {
-                                // Calculate global start index for this group based on previous groups
-                                let groupStartIndex = 0;
+                            pagedGroupKeys.map((countryCode) => {
+                                // Global group index across all pages
                                 const groupIdx = sortedGroupKeys.indexOf(countryCode);
-                                for (let i = 0; i < groupIdx; i++) {
-                                    groupStartIndex += groupedFormatters[sortedGroupKeys[i]].length;
-                                }
 
                                 return (
                                     <CountryCodeRow
                                         key={countryCode}
                                         countryCode={countryCode}
                                         items={groupedFormatters[countryCode]}
-                                        page={page}
-                                        rowsPerPage={rowsPerPage}
-                                        globalStartIndex={page * rowsPerPage + groupStartIndex}
+                                        globalStartIndex={0}
                                         onEdit={handleOpenDialog}
                                         onDelete={handleDeleteClick}
                                         onCopy={handleCopyFormatter}
@@ -712,13 +810,14 @@ export const PasswordFormatters = () => {
                 </Table>
 
                 <TablePagination
-                    rowsPerPageOptions={[5, 10, 25, 50]}
+                    rowsPerPageOptions={[10]}
                     component="div"
-                    count={totalCount}
+                    count={sortedGroupKeys.length}
                     rowsPerPage={rowsPerPage}
-                    page={page}
+                    page={outerPage}
                     onPageChange={handleChangePage}
                     onRowsPerPageChange={handleChangeRowsPerPage}
+                    labelDisplayedRows={({ from, to, count }) => `${from}–${to} of ${count} groups`}
                     sx={{
                         borderTop: `1px solid ${theme.palette.divider}`,
                         '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
@@ -734,100 +833,197 @@ export const PasswordFormatters = () => {
             <Dialog
                 open={openDialog}
                 onClose={() => { setOpenDialog(false); resetForm(); }}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
                 <DialogTitle sx={{
-                    color: TEXT_PRIMARY,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     fontSize: '1rem',
-                    py: 2,
+                    py: 1.5,
                     px: 3,
-                    borderBottom: `1px solid ${theme.palette.divider}`
+                    background: `linear-gradient(135deg, ${GREEN_DARK} 0%, ${GREEN_COLOR} 100%)`,
+                    color: '#fff',
                 }}>
-                    {selectedFormatter ? 'Edit Password Formatter' : 'Add New Password Formatter'}
+                    {selectedFormatter ? 'Edit Password Formatter' : 'Add Password Formatters'}
                 </DialogTitle>
-                <DialogContent sx={{ px: 3, py: 2 }}>
-                    <Grid container spacing={2.5} sx={{ mt: 2 }}>
-                        <Grid size={{ xs: 12 }}>
-                            <StyledTextField
-                                fullWidth
-                                label="Country Code"
-                                name="country_code"
-                                value={formData.country_code}
-                                onChange={handleInputChange}
-                                size="small"
-                                placeholder="Enter country code (e.g. 91)"
-                            />
+
+                {(createMutation.isLoading || bulkCreateMutation.isLoading || updateMutation.isLoading) && (
+                    <LinearProgress sx={{ height: 2, backgroundColor: alpha(GREEN_COLOR, 0.2), '& .MuiLinearProgress-bar': { backgroundColor: GREEN_COLOR } }} />
+                )}
+
+                <DialogContent sx={{ px: 3, pt: 2.5, pb: 1 }}>
+                    {selectedFormatter ? (
+                        /* ─── EDIT MODE: single row ─── */
+                        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                            <Grid size={{ xs: 12 }}>
+                                <StyledTextField fullWidth label="Country Code" name="country_code"
+                                    value={formData.country_code} onChange={handleInputChange}
+                                    size="small" placeholder="e.g. 91" />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                                <StyledTextField fullWidth label="Start Add" name="start_add"
+                                    value={formData.start_add} onChange={handleInputChange} size="small" />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                                <StyledTextField fullWidth label="Start Index" name="start_index"
+                                    value={formData.start_index} onChange={handleInputChange} size="small" type="number" />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                                <StyledTextField fullWidth label="End Index" name="end_index"
+                                    value={formData.end_index} onChange={handleInputChange} size="small" type="number" />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                                <StyledTextField fullWidth label="End Add" name="end_add"
+                                    value={formData.end_add} onChange={handleInputChange} size="small" />
+                            </Grid>
                         </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                            <StyledTextField
-                                fullWidth
-                                label="Start Add"
-                                name="start_add"
-                                value={formData.start_add}
-                                onChange={handleInputChange}
-                                size="small"
-                                placeholder="Enter start add"
-                            />
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                            <StyledTextField
-                                fullWidth
-                                label="Start Index"
-                                name="start_index"
-                                value={formData.start_index}
-                                onChange={handleInputChange}
-                                size="small"
-                                placeholder="Enter start index"
-                            />
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                            <StyledTextField
-                                fullWidth
-                                label="End Index"
-                                name="end_index"
-                                value={formData.end_index}
-                                onChange={handleInputChange}
-                                size="small"
-                                placeholder="Enter end index"
-                            />
-                        </Grid>
-                        <Grid size={{ xs: 12, md: 6 }}>
-                            <StyledTextField
-                                fullWidth
-                                label="End Add"
-                                name="end_add"
-                                value={formData.end_add}
-                                onChange={handleInputChange}
-                                size="small"
-                                placeholder="Enter end add"
-                            />
-                        </Grid>
-                    </Grid>
+                    ) : (
+                        /* ─── ADD MODE: bulk multi-row ─── */
+                        <Box>
+                            {/* Country Code Autocomplete */}
+                            <Box mb={2.5}>
+                                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), mb: 0.8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                    Country Code
+                                </Typography>
+                                <Autocomplete
+                                    freeSolo
+                                    options={existingCountryCodes}
+                                    value={dialogCountryCode}
+                                    onInputChange={(_, val) => setDialogCountryCode(val)}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            size="small"
+                                            placeholder="Select or type country code (e.g. 91)"
+                                            sx={{
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: 1.5,
+                                                    fontSize: '0.85rem',
+                                                    '& fieldset': { borderColor: alpha(GREEN_COLOR, 0.35) },
+                                                    '&:hover fieldset': { borderColor: GREEN_COLOR },
+                                                    '&.Mui-focused fieldset': { borderColor: GREEN_COLOR },
+                                                },
+                                            }}
+                                        />
+                                    )}
+                                    renderOption={(props, option) => (
+                                        <Box component="li" {...props} sx={{ fontSize: '0.85rem', py: 0.5 }}>
+                                            <Chip label={option} size="small" sx={{ backgroundColor: alpha(GREEN_COLOR, 0.1), color: GREEN_DARK, fontSize: '0.75rem', height: 20, mr: 1 }} />
+                                            {option}
+                                        </Box>
+                                    )}
+                                />
+                            </Box>
+
+                            {/* Input row */}
+                            <Box mb={1.5}>
+                                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), mb: 0.8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                    Formatter Row
+                                </Typography>
+                                <Box display="flex" gap={1} alignItems="center">
+                                    <StyledTextField size="small" label="Start Add" value={currentRow.start_add}
+                                        onChange={e => setCurrentRow(r => ({ ...r, start_add: e.target.value }))}
+                                        sx={{ flex: 2 }} />
+                                    <StyledTextField size="small" label="Start Index" type="number" value={currentRow.start_index}
+                                        onChange={e => setCurrentRow(r => ({ ...r, start_index: e.target.value }))}
+                                        sx={{ flex: 1 }} />
+                                    <StyledTextField size="small" label="End Index" type="number" value={currentRow.end_index}
+                                        onChange={e => setCurrentRow(r => ({ ...r, end_index: e.target.value }))}
+                                        sx={{ flex: 1 }} />
+                                    <StyledTextField size="small" label="End Add" value={currentRow.end_add}
+                                        onChange={e => setCurrentRow(r => ({ ...r, end_add: e.target.value }))}
+                                        sx={{ flex: 2 }} />
+                                    <Tooltip title="Add to list">
+                                        <span>
+                                            <Button
+                                                variant="contained"
+                                                onClick={handleAddRow}
+                                                disabled={!currentRow.start_add && !currentRow.end_add}
+                                                sx={{
+                                                    minWidth: 40, height: 38, px: 1.5, flexShrink: 0,
+                                                    backgroundColor: GREEN_COLOR,
+                                                    '&:hover': { backgroundColor: GREEN_DARK },
+                                                    borderRadius: 1.5,
+                                                }}
+                                            >
+                                                <AddIcon sx={{ fontSize: '1.1rem' }} />
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                </Box>
+                            </Box>
+
+                            {/* Pending rows preview */}
+                            {pendingRows.length > 0 && (
+                                <Box sx={{ border: `1px solid ${alpha(GREEN_COLOR, 0.25)}`, borderRadius: 1.5, overflow: 'hidden', mt: 2 }}>
+                                    <Box px={2} py={0.8} sx={{ backgroundColor: alpha(GREEN_COLOR, 0.05), borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.15)}` }}>
+                                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: GREEN_DARK }}>
+                                            {pendingRows.length} formatter{pendingRows.length !== 1 ? 's' : ''} queued — will be saved together
+                                        </Typography>
+                                    </Box>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow sx={{ backgroundColor: alpha(GREEN_COLOR, 0.03) }}>
+                                                <TableCell sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.5), py: 0.8, width: 36 }}>#</TableCell>
+                                                <TableCell sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.5), py: 0.8 }}>Start Add</TableCell>
+                                                <TableCell sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.5), py: 0.8 }}>Start Idx</TableCell>
+                                                <TableCell sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.5), py: 0.8 }}>End Idx</TableCell>
+                                                <TableCell sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.5), py: 0.8 }}>End Add</TableCell>
+                                                <TableCell sx={{ py: 0.8, width: 36 }} />
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {pendingRows.map((row, idx) => (
+                                                <TableRow key={idx} hover sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.03) } }}>
+                                                    <TableCell sx={{ fontSize: '0.78rem', py: 0.7, color: alpha(TEXT_PRIMARY, 0.5) }}>{idx + 1}</TableCell>
+                                                    <TableCell>
+                                                        <Chip label={row.start_add || '—'} size="small" sx={{ height: 18, fontSize: '0.7rem', backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontFamily: 'monospace' }} />
+                                                    </TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', py: 0.7, fontFamily: 'monospace' }}>{row.start_index || '—'}</TableCell>
+                                                    <TableCell sx={{ fontSize: '0.78rem', py: 0.7, fontFamily: 'monospace' }}>{row.end_index || '—'}</TableCell>
+                                                    <TableCell>
+                                                        <Chip label={row.end_add || '—'} size="small" sx={{ height: 18, fontSize: '0.7rem', backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontFamily: 'monospace' }} />
+                                                    </TableCell>
+                                                    <TableCell sx={{ py: 0.7 }}>
+                                                        <IconButton size="small" onClick={() => handleRemovePendingRow(idx)} sx={{ color: RED_COLOR, p: 0.3 }}>
+                                                            <DeleteIcon sx={{ fontSize: '0.85rem' }} />
+                                                        </IconButton>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </Box>
+                            )}
+                        </Box>
+                    )}
                 </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
+
+                <DialogActions sx={{ px: 3, py: 1.5, borderTop: `1px solid ${theme.palette.divider}`, gap: 1 }}>
+                    {!selectedFormatter && pendingRows.length > 0 && (
+                        <Typography sx={{ flex: 1, fontSize: '0.78rem', color: alpha(TEXT_PRIMARY, 0.5) }}>
+                            {pendingRows.length} formatter{pendingRows.length !== 1 ? 's' : ''} ready to save
+                        </Typography>
+                    )}
                     <OutlineButton
                         onClick={() => { setOpenDialog(false); resetForm(); }}
-                        size="medium"
-                        sx={{ fontSize: '0.85rem', px: 2 }}
-                        disabled={createMutation.isLoading || updateMutation.isLoading}
+                        size="small"
+                        sx={{ fontSize: '0.83rem', px: 2 }}
+                        disabled={createMutation.isLoading || updateMutation.isLoading || bulkCreateMutation.isLoading}
                     >
                         Cancel
                     </OutlineButton>
                     <GradientButton
                         onClick={handleSubmit}
                         variant="contained"
-                        disabled={createMutation.isLoading || updateMutation.isLoading}
-                        size="medium"
-                        sx={{ fontSize: '0.85rem', px: 2 }}
+                        disabled={createMutation.isLoading || updateMutation.isLoading || bulkCreateMutation.isLoading || (!selectedFormatter && pendingRows.length === 0 && !currentRow.start_add && !currentRow.end_add)}
+                        size="small"
+                        sx={{ fontSize: '0.83rem', px: 2.5, backgroundColor: GREEN_COLOR, '&:hover': { backgroundColor: GREEN_DARK } }}
                     >
-                        {createMutation.isLoading || updateMutation.isLoading ? (
-                            <CircularProgress size={18} sx={{ color: 'white' }} />
-                        ) : (
-                            selectedFormatter ? 'Update' : 'Create'
-                        )}
+                        {(createMutation.isLoading || updateMutation.isLoading || bulkCreateMutation.isLoading) ? (
+                            <CircularProgress size={16} sx={{ color: 'white' }} />
+                        ) : selectedFormatter ? 'Update' : `Save${pendingRows.length > 1 ? ` All (${pendingRows.length})` : ''}`}
                     </GradientButton>
                 </DialogActions>
             </Dialog>
