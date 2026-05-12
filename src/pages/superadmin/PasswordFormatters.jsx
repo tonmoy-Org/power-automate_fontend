@@ -35,7 +35,9 @@ import {
     ContentCopy as CopyIcon,
     KeyboardArrowDown as KeyboardArrowDownIcon,
     KeyboardArrowUp as KeyboardArrowUpIcon,
+    CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
+import { Checkbox } from '@mui/material';
 import GradientButton from '../../components/ui/GradientButton';
 import OutlineButton from '../../components/ui/OutlineButton';
 import StyledTextField from '../../components/ui/StyledTextField';
@@ -57,6 +59,11 @@ const updatePasswordFormatter = async ({ id, data }) => {
 
 const deletePasswordFormatter = async (id) => {
     const response = await axiosInstance.delete(`/password-formatters/${id}`);
+    return response.data;
+};
+
+const bulkDeletePasswordFormatters = async (ids) => {
+    const response = await axiosInstance.delete('/password-formatters/bulk', { data: { ids } });
     return response.data;
 };
 
@@ -91,6 +98,7 @@ export const PasswordFormatters = () => {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [debouncedCountry, setDebouncedCountry] = useState('');
     const [formData, setFormData] = useState(initialFormData);
+    const [selectedRows, setSelectedRows] = useState([]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -156,14 +164,59 @@ export const PasswordFormatters = () => {
             setSuccess(data.message || 'Password formatter deleted successfully');
             setOpenDeleteDialog(false);
             setFormatterToDelete(null);
+            setSelectedRows(prev => prev.filter(id => id !== formatterToDelete?._id));
             if (formattersData?.data?.length === 1 && page > 0) {
                 setPage(page - 1);
             }
         },
         onError: (error) => {
             setError(error.response?.data?.message || 'Failed to delete password formatter');
+            setOpenDeleteDialog(false);
         }
     });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: bulkDeletePasswordFormatters,
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['passwordFormatters']);
+            setSuccess(data.message || 'Password formatters deleted successfully');
+            setOpenDeleteDialog(false);
+            setSelectedRows([]);
+            const deletedCount = selectedRows.length;
+            if (formattersData?.data?.length <= deletedCount && page > 0) {
+                setPage(page - 1);
+            }
+        },
+        onError: (error) => {
+            setError(error.response?.data?.message || 'Failed to delete password formatters');
+            setOpenDeleteDialog(false);
+        }
+    });
+
+    const allFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
+    const allVisibleIds = useMemo(() => allFormatters.map(f => f._id), [allFormatters]);
+
+    const handleSelectRow = (id) => {
+        setSelectedRows(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    const handleSelectGroup = (groupIds, isSelected) => {
+        if (isSelected) {
+            setSelectedRows(prev => prev.filter(id => !groupIds.includes(id)));
+        } else {
+            setSelectedRows(prev => [...new Set([...prev, ...groupIds])]);
+        }
+    };
+
+    const handleSelectAll = () => {
+        if (selectedRows.length === allVisibleIds.length && allVisibleIds.length > 0) {
+            setSelectedRows([]);
+        } else {
+            setSelectedRows(allVisibleIds);
+        }
+    };
 
     const formatters = useMemo(() => formattersData?.data || [], [formattersData]);
     const totalCount = useMemo(() => formattersData?.pagination?.total || 0, [formattersData]);
@@ -246,6 +299,8 @@ export const PasswordFormatters = () => {
     const handleDeleteConfirm = () => {
         if (formatterToDelete) {
             deleteMutation.mutate(formatterToDelete._id);
+        } else if (selectedRows.length > 0) {
+            bulkDeleteMutation.mutate(selectedRows);
         }
     };
 
@@ -274,13 +329,15 @@ export const PasswordFormatters = () => {
         theme,
         colors: { GREEN_COLOR, GREEN_DARK, RED_COLOR, TEXT_PRIMARY },
         groupIndex,
+        selectedRows,
+        handleSelectRow,
+        handleSelectGroup,
     }) => {
         const [open, setOpen] = useState(false);
 
         return (
             <>
                 <TableRow
-                    onClick={() => setOpen(!open)}
                     sx={{
                         cursor: 'pointer',
                         backgroundColor: alpha(GREEN_COLOR, open ? 0.12 : 0.05),
@@ -289,7 +346,16 @@ export const PasswordFormatters = () => {
                         transition: 'all 0.2s ease',
                     }}
                 >
-                    <TableCell sx={{ py: 1, width: 40 }}>
+                    <TableCell padding="checkbox" sx={{ pl: 2 }} onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                            size="small"
+                            checked={items.length > 0 && items.every(i => selectedRows.includes(i._id))}
+                            indeterminate={items.some(i => selectedRows.includes(i._id)) && !items.every(i => selectedRows.includes(i._id))}
+                            onChange={() => handleSelectGroup(items.map(i => i._id), items.every(i => selectedRows.includes(i._id)))}
+                            sx={{ color: alpha(GREEN_COLOR, 0.6), '&.Mui-checked': { color: GREEN_COLOR } }}
+                        />
+                    </TableCell>
+                    <TableCell sx={{ py: 1, width: 40 }} onClick={() => setOpen(!open)}>
                         <IconButton size="small" sx={{ color: GREEN_COLOR }}>
                             {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                         </IconButton>
@@ -336,6 +402,7 @@ export const PasswordFormatters = () => {
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow sx={{ backgroundColor: alpha(GREEN_COLOR, 0.03) }}>
+                                            <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`, width: 40 }} />
                                             <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1, width: 80 }}>Serial</TableCell>
                                             <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Add</TableCell>
                                             <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Index</TableCell>
@@ -351,7 +418,15 @@ export const PasswordFormatters = () => {
                                                 hover
                                                 sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
                                             >
-                                                <TableCell sx={{ py: 1 }}>
+                                                <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={selectedRows.includes(formatter._id)}
+                                                        onChange={() => handleSelectRow(formatter._id)}
+                                                        sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
                                                     <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
                                                         {idx + 1}
                                                     </Typography>
@@ -473,6 +548,51 @@ export const PasswordFormatters = () => {
                 </Box>
             </Box>
 
+            {selectedRows.length > 0 && (
+                <Box
+                    display="flex"
+                    alignItems="center"
+                    gap={1.5}
+                    mb={2.5}
+                    px={2}
+                    py={1}
+                    sx={{
+                        borderRadius: 1.5,
+                        backgroundColor: alpha(GREEN_COLOR, 0.05),
+                        border: `1px solid ${alpha(GREEN_COLOR, 0.2)}`,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    <CheckCircleIcon sx={{ fontSize: '0.9rem', color: GREEN_COLOR }} />
+                    <Typography sx={{ fontSize: '0.8rem', color: GREEN_COLOR, fontWeight: 600 }}>
+                        {selectedRows.length} formatter{selectedRows.length !== 1 ? 's' : ''} selected
+                    </Typography>
+                    <Box flex={1} />
+                    <Button
+                        size="small"
+                        variant="contained"
+                        color="error"
+                        startIcon={<DeleteIcon sx={{ fontSize: '0.8rem' }} />}
+                        onClick={() => {
+                            setFormatterToDelete(null);
+                            setOpenDeleteDialog(true);
+                        }}
+                        sx={{
+                            fontSize: '0.75rem',
+                            py: 0.4,
+                            px: 1.2,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            backgroundColor: RED_COLOR,
+                            '&:hover': { backgroundColor: RED_DARK },
+                        }}
+                    >
+                        Delete Selected
+                    </Button>
+                </Box>
+            )}
+
             <Box mb={3} display="flex" gap={2}>
                 <Box sx={{ flexGrow: 1 }}>
                     <StyledTextField
@@ -527,6 +647,15 @@ export const PasswordFormatters = () => {
                         <TableRow sx={{
                             backgroundColor: alpha(GREEN_COLOR, theme.palette.mode === 'dark' ? 0.1 : 0.05)
                         }}>
+                            <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `2px solid ${GREEN_COLOR}`, py: 1.5 }}>
+                                <Checkbox
+                                    size="small"
+                                    checked={allVisibleIds.length > 0 && selectedRows.length === allVisibleIds.length}
+                                    indeterminate={selectedRows.length > 0 && selectedRows.length < allVisibleIds.length}
+                                    onChange={handleSelectAll}
+                                    sx={{ color: alpha(GREEN_COLOR, 0.6), '&.Mui-checked': { color: GREEN_COLOR } }}
+                                />
+                            </TableCell>
                             <TableCell sx={{ width: 40, borderBottom: `2px solid ${GREEN_COLOR}`, py: 1.5 }} />
                             <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5, width: '60px' }}>Serial</TableCell>
                             <TableCell sx={{ fontWeight: 600, color: TEXT_PRIMARY, borderBottom: `2px solid ${GREEN_COLOR}`, fontSize: '0.85rem', py: 1.5 }}>Country Code</TableCell>
@@ -572,6 +701,9 @@ export const PasswordFormatters = () => {
                                         theme={theme}
                                         colors={{ GREEN_COLOR, GREEN_DARK, RED_COLOR, TEXT_PRIMARY }}
                                         groupIndex={groupIdx}
+                                        selectedRows={selectedRows}
+                                        handleSelectRow={handleSelectRow}
+                                        handleSelectGroup={handleSelectGroup}
                                     />
                                 );
                             })

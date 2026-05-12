@@ -1422,11 +1422,15 @@ export const PhoneNumbers = () => {
     queryFn: () =>
       fetchPhoneNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
     keepPreviousData: true,
+    staleTime: 30000, // 30 seconds
+    cacheTime: 600000, // 10 minutes
   });
 
   const { data: formattersData, isLoading: formattersLoading } = useQuery({
     queryKey: ["passwordFormatters"],
     queryFn: fetchPasswordFormatters,
+    staleTime: 300000, // 5 minutes
+    cacheTime: 3600000, // 1 hour
   });
 
   const createMutation = useMutation({
@@ -2212,7 +2216,7 @@ export const PhoneNumbers = () => {
           minHeight: 380,
         }}
       >
-        {isLoading && (
+        {isLoading && !phoneNumbersData && (
           <LinearProgress
             sx={{
               borderRadius: "2px 2px 0 0",
