@@ -85,6 +85,197 @@ const initialFormData = {
 
 const initialRowData = { start_add: '', start_index: '', end_index: '', end_add: '' };
 
+
+const INNER_PAGE_SIZE = 30;
+
+const CountryCodeRow = ({
+    countryCode,
+    items,
+    globalStartIndex,
+    onEdit,
+    onDelete,
+    onCopy,
+    theme,
+    colors: { GREEN_COLOR, GREEN_DARK, RED_COLOR, TEXT_PRIMARY },
+    groupIndex,
+    selectedRows,
+    handleSelectRow,
+    handleSelectGroup,
+}) => {
+    const [open, setOpen] = useState(false);
+    const [innerPage, setInnerPage] = useState(0);
+
+    const pagedItems = items.slice(innerPage * INNER_PAGE_SIZE, (innerPage + 1) * INNER_PAGE_SIZE);
+    const totalInnerPages = Math.ceil(items.length / INNER_PAGE_SIZE);
+
+    return (
+        <>
+            <TableRow
+                sx={{
+                    cursor: 'pointer',
+                    backgroundColor: alpha(GREEN_COLOR, open ? 0.12 : 0.05),
+                    '&:hover': { backgroundColor: alpha(GREEN_COLOR, open ? 0.15 : 0.08) },
+                    borderLeft: open ? `4px solid ${GREEN_COLOR}` : '4px solid transparent',
+                    transition: 'all 0.2s ease',
+                }}
+            >
+                <TableCell padding="checkbox" sx={{ pl: 2 }} onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                        size="small"
+                        checked={items.length > 0 && items.every(i => selectedRows.includes(i._id))}
+                        indeterminate={items.some(i => selectedRows.includes(i._id)) && !items.every(i => selectedRows.includes(i._id))}
+                        onChange={() => handleSelectGroup(items.map(i => i._id), items.every(i => selectedRows.includes(i._id)))}
+                        sx={{ color: alpha(GREEN_COLOR, 0.6), '&.Mui-checked': { color: GREEN_COLOR } }}
+                    />
+                </TableCell>
+                <TableCell sx={{ py: 1, width: 40 }} onClick={() => setOpen(!open)}>
+                    <IconButton size="small" sx={{ color: GREEN_COLOR }}>
+                        {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                    </IconButton>
+                </TableCell>
+                <TableCell sx={{ py: 1, width: 60 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: TEXT_PRIMARY, fontSize: '0.8rem' }}>
+                        {groupIndex + 1}
+                    </Typography>
+                </TableCell>
+                <TableCell sx={{ py: 1 }}>
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: GREEN_DARK, fontSize: '0.9rem' }}>
+                            {countryCode}
+                        </Typography>
+                        <Chip
+                            label={`${items.length} Formatter${items.length !== 1 ? 's' : ''}`}
+                            size="small"
+                            sx={{
+                                height: 20,
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                backgroundColor: alpha(GREEN_COLOR, 0.1),
+                                color: GREEN_DARK,
+                                borderRadius: '4px'
+                            }}
+                        />
+                    </Box>
+                </TableCell>
+                <TableCell colSpan={5} />
+            </TableRow>
+
+            <TableRow>
+                <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
+                    <Collapse in={open} timeout="auto" unmountOnExit>
+                        <Box sx={{
+                            borderLeft: `3px solid ${alpha(GREEN_COLOR, 0.2)}`,
+                            ml: 4,
+                            mb: 1,
+                            mr: 1,
+                            backgroundColor: alpha(GREEN_COLOR, 0.02),
+                            borderRadius: '0 0 8px 8px',
+                            overflow: 'hidden'
+                        }}>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ backgroundColor: alpha(GREEN_COLOR, 0.03) }}>
+                                        <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`, width: 40 }} />
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1, width: 80 }}>Serial</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Add</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Index</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Index</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Add</TableCell>
+                                        <TableCell align="right" sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {pagedItems.map((formatter, idx) => {
+                                        const serialNumber = innerPage * INNER_PAGE_SIZE + idx + 1;
+                                        return (
+                                            <TableRow
+                                                key={formatter._id}
+                                                hover
+                                                sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
+                                            >
+                                                <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={selectedRows.includes(formatter._id)}
+                                                        onChange={() => handleSelectRow(formatter._id)}
+                                                        sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                                        {serialNumber}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Chip label={formatter.start_add ?? '—'} size="small"
+                                                        sx={{ backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontWeight: 500, fontSize: '0.7rem', height: 20, fontFamily: 'monospace' }} />
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                        {formatter.start_index ?? '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                        {formatter.end_index ?? '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Chip label={formatter.end_add ?? '—'} size="small"
+                                                        sx={{ backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontWeight: 500, fontSize: '0.7rem', height: 20, fontFamily: 'monospace' }} />
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ py: 1 }}>
+                                                    <Box display="flex" justifyContent="flex-end">
+                                                        <Tooltip title="Copy formatter">
+                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onCopy(formatter); }} sx={{ color: GREEN_COLOR, p: 0.5 }}>
+                                                                <CopyIcon sx={{ fontSize: '1rem' }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Edit formatter">
+                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(formatter); }} sx={{ color: GREEN_COLOR, p: 0.5 }}>
+                                                                <EditIcon sx={{ fontSize: '1rem' }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Delete formatter">
+                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(formatter); }} sx={{ color: RED_COLOR, p: 0.5 }}>
+                                                                <DeleteIcon sx={{ fontSize: '1rem' }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+
+                            {totalInnerPages > 1 && (
+                                <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1} px={2} py={0.8}
+                                    sx={{ borderTop: `1px solid ${alpha(GREEN_COLOR, 0.12)}` }}>
+                                    <Typography sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.55) }}>
+                                        {innerPage * INNER_PAGE_SIZE + 1}–{Math.min((innerPage + 1) * INNER_PAGE_SIZE, items.length)} of {items.length}
+                                    </Typography>
+                                    <IconButton size="small" disabled={innerPage === 0} onClick={() => setInnerPage(p => p - 1)}
+                                        sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}>
+                                        <KeyboardArrowUpIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
+                                    </IconButton>
+                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: TEXT_PRIMARY }}>
+                                        {innerPage + 1} / {totalInnerPages}
+                                    </Typography>
+                                    <IconButton size="small" disabled={innerPage >= totalInnerPages - 1} onClick={() => setInnerPage(p => p + 1)}
+                                        sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}>
+                                        <KeyboardArrowDownIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
+                                    </IconButton>
+                                </Box>
+                            )}
+                        </Box>
+                    </Collapse>
+                </TableCell>
+            </TableRow>
+        </>
+    );
+};
+
 export const PasswordFormatters = () => {
     const theme = useTheme();
     const queryClient = useQueryClient();
@@ -378,244 +569,6 @@ export const PasswordFormatters = () => {
         );
     }
 
-    const CountryCodeRow = ({
-        countryCode,
-        items,
-        page,
-        rowsPerPage,
-        globalStartIndex,
-        onEdit,
-        onDelete,
-        onCopy,
-        theme,
-        colors: { GREEN_COLOR, GREEN_DARK, RED_COLOR, TEXT_PRIMARY },
-        groupIndex,
-        selectedRows,
-        handleSelectRow,
-        handleSelectGroup,
-    }) => {
-        const INNER_PAGE_SIZE = 30;
-        const [open, setOpen] = useState(false);
-        const [innerPage, setInnerPage] = useState(0);
-
-        const pagedItems = items.slice(innerPage * INNER_PAGE_SIZE, (innerPage + 1) * INNER_PAGE_SIZE);
-        const totalInnerPages = Math.ceil(items.length / INNER_PAGE_SIZE);
-
-        return (
-            <>
-                <TableRow
-                    sx={{
-                        cursor: 'pointer',
-                        backgroundColor: alpha(GREEN_COLOR, open ? 0.12 : 0.05),
-                        '&:hover': { backgroundColor: alpha(GREEN_COLOR, open ? 0.15 : 0.08) },
-                        borderLeft: open ? `4px solid ${GREEN_COLOR}` : '4px solid transparent',
-                        transition: 'all 0.2s ease',
-                    }}
-                >
-                    <TableCell padding="checkbox" sx={{ pl: 2 }} onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                            size="small"
-                            checked={items.length > 0 && items.every(i => selectedRows.includes(i._id))}
-                            indeterminate={items.some(i => selectedRows.includes(i._id)) && !items.every(i => selectedRows.includes(i._id))}
-                            onChange={() => handleSelectGroup(items.map(i => i._id), items.every(i => selectedRows.includes(i._id)))}
-                            sx={{ color: alpha(GREEN_COLOR, 0.6), '&.Mui-checked': { color: GREEN_COLOR } }}
-                        />
-                    </TableCell>
-                    <TableCell sx={{ py: 1, width: 40 }} onClick={() => setOpen(!open)}>
-                        <IconButton size="small" sx={{ color: GREEN_COLOR }}>
-                            {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                        </IconButton>
-                    </TableCell>
-                    <TableCell sx={{ py: 1, width: 60 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: TEXT_PRIMARY, fontSize: '0.8rem' }}>
-                            {groupIndex + 1}
-                        </Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 1 }}>
-                        <Box display="flex" alignItems="center" gap={1.5}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: GREEN_DARK, fontSize: '0.9rem' }}>
-                                {countryCode}
-                            </Typography>
-                            <Chip
-                                label={`${items.length} Formatter${items.length !== 1 ? 's' : ''}`}
-                                size="small"
-                                sx={{
-                                    height: 20,
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600,
-                                    backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                    color: GREEN_DARK,
-                                    borderRadius: '4px'
-                                }}
-                            />
-                        </Box>
-                    </TableCell>
-                    <TableCell colSpan={5} />
-                </TableRow>
-
-                <TableRow>
-                    <TableCell colSpan={8} sx={{ p: 0, border: 0 }}>
-                        <Collapse in={open} timeout="auto" unmountOnExit>
-                            <Box sx={{
-                                borderLeft: `3px solid ${alpha(GREEN_COLOR, 0.2)}`,
-                                ml: 4,
-                                mb: 1,
-                                mr: 1,
-                                backgroundColor: alpha(GREEN_COLOR, 0.02),
-                                borderRadius: '0 0 8px 8px',
-                                overflow: 'hidden'
-                            }}>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow sx={{ backgroundColor: alpha(GREEN_COLOR, 0.03) }}>
-                                            <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`, width: 40 }} />
-                                            <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1, width: 80 }}>Serial</TableCell>
-                                            <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Add</TableCell>
-                                            <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Index</TableCell>
-                                            <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Index</TableCell>
-                                            <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Add</TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {pagedItems.map((formatter, idx) => {
-                                            const serialNumber = innerPage * INNER_PAGE_SIZE + idx + 1;
-                                            return (
-                                                <TableRow
-                                                    key={formatter._id}
-                                                    hover
-                                                    sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
-                                                >
-                                                    <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
-                                                        <Checkbox
-                                                            size="small"
-                                                            checked={selectedRows.includes(formatter._id)}
-                                                            onChange={() => handleSelectRow(formatter._id)}
-                                                            sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
-                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                                            {serialNumber}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 1 }}>
-                                                        <Chip
-                                                            label={formatter.start_add ?? '—'}
-                                                            size="small"
-                                                            sx={{
-                                                                backgroundColor: alpha(GREEN_COLOR, 0.08),
-                                                                color: GREEN_DARK,
-                                                                fontWeight: 500,
-                                                                fontSize: '0.7rem',
-                                                                height: 20,
-                                                                fontFamily: 'monospace',
-                                                            }}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 1 }}>
-                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                                            {formatter.start_index ?? '—'}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 1 }}>
-                                                        <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                                            {formatter.end_index ?? '—'}
-                                                        </Typography>
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 1 }}>
-                                                        <Chip
-                                                            label={formatter.end_add ?? '—'}
-                                                            size="small"
-                                                            sx={{
-                                                                backgroundColor: alpha(GREEN_COLOR, 0.08),
-                                                                color: GREEN_DARK,
-                                                                fontWeight: 500,
-                                                                fontSize: '0.7rem',
-                                                                height: 20,
-                                                                fontFamily: 'monospace',
-                                                            }}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell align="right" sx={{ py: 1 }}>
-                                                        <Box display="flex" justifyContent="flex-end">
-                                                            <Tooltip title="Copy formatter">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    onClick={(e) => { e.stopPropagation(); onCopy(formatter); }}
-                                                                    sx={{ color: GREEN_COLOR, p: 0.5 }}
-                                                                >
-                                                                    <CopyIcon sx={{ fontSize: '1rem' }} />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                            <Tooltip title="Edit formatter">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    onClick={(e) => { e.stopPropagation(); onEdit(formatter); }}
-                                                                    sx={{ color: GREEN_COLOR, p: 0.5 }}
-                                                                >
-                                                                    <EditIcon sx={{ fontSize: '1rem' }} />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                            <Tooltip title="Delete formatter">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    onClick={(e) => { e.stopPropagation(); onDelete(formatter); }}
-                                                                    sx={{ color: RED_COLOR, p: 0.5 }}
-                                                                >
-                                                                    <DeleteIcon sx={{ fontSize: '1rem' }} />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        </Box>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                    </TableBody>
-                                </Table>
-
-                                {totalInnerPages > 1 && (
-                                    <Box
-                                        display="flex"
-                                        alignItems="center"
-                                        justifyContent="flex-end"
-                                        gap={1}
-                                        px={2}
-                                        py={0.8}
-                                        sx={{ borderTop: `1px solid ${alpha(GREEN_COLOR, 0.12)}` }}
-                                    >
-                                        <Typography sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.55) }}>
-                                            {innerPage * INNER_PAGE_SIZE + 1}–{Math.min((innerPage + 1) * INNER_PAGE_SIZE, items.length)} of {items.length}
-                                        </Typography>
-                                        <IconButton
-                                            size="small"
-                                            disabled={innerPage === 0}
-                                            onClick={() => setInnerPage(p => p - 1)}
-                                            sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}
-                                        >
-                                            <KeyboardArrowUpIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
-                                        </IconButton>
-                                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: TEXT_PRIMARY }}>
-                                            {innerPage + 1} / {totalInnerPages}
-                                        </Typography>
-                                        <IconButton
-                                            size="small"
-                                            disabled={innerPage >= totalInnerPages - 1}
-                                            onClick={() => setInnerPage(p => p + 1)}
-                                            sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}
-                                        >
-                                            <KeyboardArrowDownIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
-                                        </IconButton>
-                                    </Box>
-                                )}
-                            </Box>
-                        </Collapse>
-                    </TableCell>
-                </TableRow>
-            </>
-        );
-    };
-
     return (
         <Box>
             <Helmet>
@@ -882,7 +835,7 @@ export const PasswordFormatters = () => {
                         /* ─── ADD MODE: bulk multi-row ─── */
                         <Box>
                             {/* Country Code Autocomplete */}
-                            <Box mb={2.5}>
+                            <Box my={2.5}>
                                 <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), mb: 0.8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                     Country Code
                                 </Typography>
@@ -925,10 +878,10 @@ export const PasswordFormatters = () => {
                                     <StyledTextField size="small" label="Start Add" value={currentRow.start_add}
                                         onChange={e => setCurrentRow(r => ({ ...r, start_add: e.target.value }))}
                                         sx={{ flex: 2 }} />
-                                    <StyledTextField size="small" label="Start Index" type="number" value={currentRow.start_index}
+                                    <StyledTextField size="small" label="Start Index" type="text" value={currentRow.start_index}
                                         onChange={e => setCurrentRow(r => ({ ...r, start_index: e.target.value }))}
                                         sx={{ flex: 1 }} />
-                                    <StyledTextField size="small" label="End Index" type="number" value={currentRow.end_index}
+                                    <StyledTextField size="small" label="End Index" type="text" value={currentRow.end_index}
                                         onChange={e => setCurrentRow(r => ({ ...r, end_index: e.target.value }))}
                                         sx={{ flex: 1 }} />
                                     <StyledTextField size="small" label="End Add" value={currentRow.end_add}

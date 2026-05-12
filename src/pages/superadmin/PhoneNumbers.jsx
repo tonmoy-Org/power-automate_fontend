@@ -2779,7 +2779,7 @@ export const PhoneNumbers = () => {
               <StyledTextField
                 fullWidth
                 label="Limit"
-                type="number"
+                type="text"
                 value={bulkEditDialog.limit}
                 onChange={(e) =>
                   setBulkEditDialog((prev) => ({
