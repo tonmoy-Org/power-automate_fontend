@@ -11,6 +11,7 @@ const UserManagement = React.lazy(() => import('../pages/superadmin/UserManageme
 const PhoneNumbers = React.lazy(() => import('../pages/superadmin/PhoneNumbers'));
 const PasswordFormatters = React.lazy(() => import('../pages/superadmin/PasswordFormatters'));
 const ValidPhoneNumber = React.lazy(() => import('../pages/superadmin/ValidPhoneNumber'));
+const MachineManagement = React.lazy(() => import('../pages/superadmin/MachineManagement'));
 
 
 
@@ -62,6 +63,7 @@ export const AppRoutes = () => {
             <Route path="phone-numbers" element={<PhoneNumbers />} />
             <Route path="password-formatters" element={<PasswordFormatters />} />
             <Route path="valid-phone-password" element={<ValidPhoneNumber />} />
+            <Route path="machine-management" element={<MachineManagement />} />
             <Route path="profile" element={<SuperAdminProfile />} />
           </Route>
           {/* Fallback Routes */}

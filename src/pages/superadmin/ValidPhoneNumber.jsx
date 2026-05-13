@@ -79,7 +79,7 @@ const bulkDeleteCredentials = async (ids) => {
 };
 
 const deleteByTypeAndCountry = async ({ type, countryCode }) => {
-  const response = await axiosInstance.delete("/phone-credentials/type", { data: { type, countryCode } });
+  const response = await axiosInstance.delete("/phone-credentials/by-type", { data: { type, countryCode } });
   return response.data;
 };
 
@@ -741,7 +741,7 @@ export default function ValidPhoneNumber() {
 
   const handleDeleteSingleConfirm = () => {
     if (deleteSingleTarget) {
-      deleteSingleMutation.mutate(deleteSingleTarget);
+      deleteSingleMutation.mutate(deleteSingleTarget._id);
     }
   };
 

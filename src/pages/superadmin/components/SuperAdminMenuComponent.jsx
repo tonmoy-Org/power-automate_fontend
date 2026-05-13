@@ -7,6 +7,7 @@ import {
     LockOutlined as PasswordFormatterIcon,
     PhoneIphone as PhoneIcon,
     VpnKey as VpnKeyIcon,
+    Computer as ComputerIcon,
 } from '@mui/icons-material';
 
 export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
@@ -23,6 +24,11 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                     text: 'Users',
                     icon: <PeopleIcon />,
                     path: '/superadmin-dashboard/users'
+                },
+                {
+                    text: 'Machine Management',
+                    icon: <ComputerIcon />,
+                    path: '/superadmin-dashboard/machine-management'
                 },
             ]
         },
