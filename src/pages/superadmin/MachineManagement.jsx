@@ -157,7 +157,7 @@ const MachineRow = ({ machine, theme, BLUE_COLOR, GREEN_COLOR, RED_COLOR, GREY_C
         {/* Progress Gauges */}
         <Grid item xs={12} md={6}>
           <Box display="flex" gap={2} justifyContent="space-between" flexWrap="wrap">
-            {machine.tasks.map((val, idx) => (
+            {(machine.tasks || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).map((val, idx) => (
               <CircularProgressWithLabel key={idx} value={val} index={idx} />
             ))}
           </Box>
