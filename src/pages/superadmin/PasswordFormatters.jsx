@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
     Box,
     Typography,
@@ -88,7 +88,7 @@ const initialRowData = { start_add: '', start_index: '', end_index: '', end_add:
 
 const INNER_PAGE_SIZE = 30;
 
-const CountryCodeRow = ({
+const CountryCodeRow = memo(({
     countryCode,
     items,
     globalStartIndex,
@@ -274,7 +274,7 @@ const CountryCodeRow = ({
             </TableRow>
         </>
     );
-};
+});
 
 export const PasswordFormatters = () => {
     const theme = useTheme();
@@ -364,69 +364,109 @@ export const PasswordFormatters = () => {
 
     const updateMutation = useMutation({
         mutationFn: updatePasswordFormatter,
+        onMutate: async (newData) => {
+            await queryClient.cancelQueries({ queryKey: ['passwordFormatters'] });
+            const previousData = queryClient.getQueryData(['passwordFormatters', debouncedSearch, debouncedCountry]);
+            if (previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], (old) => ({
+                    ...old,
+                    data: old.data.map(f => f._id === newData.id ? { ...f, ...newData.data } : f)
+                }));
+            }
+            return { previousData };
+        },
         onSuccess: (data) => {
-            queryClient.invalidateQueries(['passwordFormatters']);
             setSuccess(data.message || 'Password formatter updated successfully');
             setOpenDialog(false);
             resetForm();
         },
-        onError: (error) => {
+        onError: (error, newData, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], context.previousData);
+            }
             setError(error.response?.data?.message || 'Failed to update password formatter');
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries(['passwordFormatters']);
         }
     });
 
     const deleteMutation = useMutation({
         mutationFn: deletePasswordFormatter,
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ['passwordFormatters'] });
+            const previousData = queryClient.getQueryData(['passwordFormatters', debouncedSearch, debouncedCountry]);
+            if (previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], (old) => ({
+                    ...old,
+                    data: old.data.filter(f => f._id !== id)
+                }));
+            }
+            return { previousData };
+        },
         onSuccess: (data) => {
-            queryClient.invalidateQueries(['passwordFormatters']);
             setSuccess(data.message || 'Password formatter deleted successfully');
             setOpenDeleteDialog(false);
             setFormatterToDelete(null);
-            setSelectedRows(prev => prev.filter(id => id !== formatterToDelete?._id));
-            if (formattersData?.data?.length === 1 && page > 0) {
-                setPage(page - 1);
-            }
         },
-        onError: (error) => {
+        onError: (error, id, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], context.previousData);
+            }
             setError(error.response?.data?.message || 'Failed to delete password formatter');
             setOpenDeleteDialog(false);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries(['passwordFormatters']);
         }
     });
 
     const bulkDeleteMutation = useMutation({
         mutationFn: bulkDeletePasswordFormatters,
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: ['passwordFormatters'] });
+            const previousData = queryClient.getQueryData(['passwordFormatters', debouncedSearch, debouncedCountry]);
+            if (previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], (old) => ({
+                    ...old,
+                    data: old.data.filter(f => !ids.includes(f._id))
+                }));
+            }
+            return { previousData };
+        },
         onSuccess: (data) => {
-            queryClient.invalidateQueries(['passwordFormatters']);
             setSuccess(data.message || 'Password formatters deleted successfully');
             setOpenDeleteDialog(false);
             setSelectedRows([]);
-            const deletedCount = selectedRows.length;
-            if (formattersData?.data?.length <= deletedCount && page > 0) {
-                setPage(page - 1);
-            }
         },
-        onError: (error) => {
+        onError: (error, ids, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], context.previousData);
+            }
             setError(error.response?.data?.message || 'Failed to delete password formatters');
             setOpenDeleteDialog(false);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries(['passwordFormatters']);
         }
     });
 
     const allFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
     const allVisibleIds = useMemo(() => allFormatters.map(f => f._id), [allFormatters]);
 
-    const handleSelectRow = (id) => {
+    const handleSelectRow = useCallback((id) => {
         setSelectedRows(prev =>
             prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
         );
-    };
+    }, []);
 
-    const handleSelectGroup = (groupIds, isSelected) => {
+    const handleSelectGroup = useCallback((groupIds, isSelected) => {
         if (isSelected) {
             setSelectedRows(prev => prev.filter(id => !groupIds.includes(id)));
         } else {
             setSelectedRows(prev => [...new Set([...prev, ...groupIds])]);
         }
-    };
+    }, []);
 
     const handleSelectAll = () => {
         if (selectedRows.length === allVisibleIds.length && allVisibleIds.length > 0) {
@@ -490,13 +530,13 @@ export const PasswordFormatters = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleCopyFormatter = (formatter) => {
+    const handleCopyFormatter = useCallback((formatter) => {
         const text = `${formatter.start_add ?? ''} → ${formatter.start_index ?? ''} → ${formatter.end_index ?? ''} → ${formatter.end_add ?? ''}`;
         navigator.clipboard.writeText(text);
         setSuccess('Formatter copied to clipboard');
-    };
+    }, []);
 
-    const handleOpenDialog = (formatter = null) => {
+    const handleOpenDialog = useCallback((formatter = null) => {
         if (formatter) {
             setSelectedFormatter(formatter);
             setFormData({
@@ -510,7 +550,7 @@ export const PasswordFormatters = () => {
             resetForm();
         }
         setOpenDialog(true);
-    };
+    }, [resetForm]);
 
     const handleSubmit = () => {
         if (selectedFormatter) {
@@ -543,10 +583,10 @@ export const PasswordFormatters = () => {
         }
     };
 
-    const handleDeleteClick = (formatter) => {
+    const handleDeleteClick = useCallback((formatter) => {
         setFormatterToDelete(formatter);
         setOpenDeleteDialog(true);
-    };
+    }, []);
 
     const handleDeleteConfirm = () => {
         if (formatterToDelete) {

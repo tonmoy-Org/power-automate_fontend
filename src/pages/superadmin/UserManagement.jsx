@@ -809,3 +809,5 @@ export const UserManagement = () => {
         </Box>
     );
 };
+
+export default UserManagement;

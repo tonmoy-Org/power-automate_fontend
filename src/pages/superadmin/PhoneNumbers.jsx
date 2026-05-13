@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, memo } from "react";
 import {
   Box,
   Typography,
@@ -427,7 +427,7 @@ function NoSearchResults({ searchQuery, debouncedInnerSearch, theme, TEXT }) {
   );
 }
 
-function CountryCodeRow({
+const CountryCodeRow = memo(({
   group,
   globalSelectedRows,
   onGlobalSelectGroup,
@@ -441,7 +441,7 @@ function CountryCodeRow({
   globalStartIndex,
   absoluteGroupIdx,
   onBulkEdit,
-}) {
+}) => {
   const [open, setOpen] = useState(false);
   const [innerPage, setInnerPage] = useState(0);
   const [innerSelected, setInnerSelected] = useState([]);
@@ -1338,7 +1338,7 @@ function CountryCodeRow({
       />
     </>
   );
-}
+});
 
 export const PhoneNumbers = () => {
   const theme = useTheme();
@@ -1475,74 +1475,190 @@ export const PhoneNumbers = () => {
 
   const updateMutation = useMutation({
     mutationFn: updatePhoneNumber,
+    onMutate: async (newData) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
+      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      
+      if (previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.map((item) =>
+              item._id === newData.id ? { ...item, ...newData.data } : item
+            ),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
-      await refetch();
       setSuccess(data.message || "Phone number updated successfully");
       setOpenDialog(false);
       resetForm();
     },
-    onError: (err) => {
+    onError: (err, newData, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to update phone number");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deletePhoneNumber,
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
+      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      
+      if (previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.filter((item) => item._id !== deletedId),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
-      await refetch();
       setSuccess(data.message || "Phone number deleted successfully");
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, deletedId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to delete phone number");
       closeConfirm();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
     },
   });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: bulkDeletePhoneNumbers,
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
+      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      
+      if (previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.filter((item) => !ids.includes(item._id)),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
-      await refetch();
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, ids, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to delete phone numbers");
       closeConfirm();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
     },
   });
 
   const bulkStatusMutation = useMutation({
     mutationFn: ({ ids, status }) => bulkUpdatePhoneNumberStatus(ids, status),
+    onMutate: async ({ ids, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
+      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      
+      if (previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.map((item) =>
+              ids.includes(item._id) ? { ...item, is_active: status } : item
+            ),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
-      await refetch();
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to update status");
       closeConfirm();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
     },
   });
 
   const bulkUpdateMutation = useMutation({
     mutationFn: ({ ids, data }) => bulkUpdatePhoneNumbers(ids, data),
+    onMutate: async ({ ids, data: updateData }) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
+      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      
+      if (previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.map((item) =>
+              ids.includes(item._id) ? { ...item, ...updateData } : item
+            ),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
-      await refetch();
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to update numbers");
       closeConfirm();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
     },
   });
 
@@ -1599,7 +1715,7 @@ export const PhoneNumbers = () => {
     Object.keys(formatterGroupsData).sort()
   , [formatterGroupsData]);
 
-  const handleSelectAllVisible = () => {
+  const handleSelectAllVisible = useCallback(() => {
     if (globalAllSelected) {
       setGlobalSelectedRows((prev) =>
         prev.filter((id) => !allVisibleIds.includes(id)),
@@ -1609,9 +1725,9 @@ export const PhoneNumbers = () => {
         ...new Set([...prev, ...allVisibleIds]),
       ]);
     }
-  };
+  }, [globalAllSelected, allVisibleIds]);
 
-  const handleSelectGroupAll = (groupIds, groupAllSelected) => {
+  const handleSelectGroupAll = useCallback((groupIds, groupAllSelected) => {
     if (groupAllSelected) {
       setGlobalSelectedRows((prev) =>
         prev.filter((id) => !groupIds.includes(id)),
@@ -1619,7 +1735,7 @@ export const PhoneNumbers = () => {
     } else {
       setGlobalSelectedRows((prev) => [...new Set([...prev, ...groupIds])]);
     }
-  };
+  }, []);
 
   const resetForm = () => {
     setFormData(initialFormData);
@@ -1691,7 +1807,7 @@ export const PhoneNumbers = () => {
       .filter(Boolean);
   };
 
-  const handleOpenDialog = (number = null) => {
+  const handleOpenDialog = useCallback((number = null) => {
     if (number) {
       setSelectedNumber(number);
       setFormData({
@@ -1709,7 +1825,7 @@ export const PhoneNumbers = () => {
       resetForm();
     }
     setOpenDialog(true);
-  };
+  }, [passwordFormatters, resetForm]);
 
   useEffect(() => {
     if (
@@ -1737,7 +1853,7 @@ export const PhoneNumbers = () => {
     setSuccess("Duplicates removed successfully");
   };
 
-  const handleDeleteClick = (item) => {
+  const handleDeleteClick = useCallback((item) => {
     openConfirm({
       title: "Confirm Delete",
       titleColor: RED,
@@ -1758,9 +1874,9 @@ export const PhoneNumbers = () => {
         deleteMutation.mutate(item._id);
       },
     });
-  };
+  }, [RED, RED_DARK, deleteMutation, openConfirm]);
 
-  const handleDeleteGroupClick = (group) => {
+  const handleDeleteGroupClick = useCallback((group) => {
     openConfirm({
       title: "Delete Group",
       titleColor: RED,
@@ -1782,7 +1898,7 @@ export const PhoneNumbers = () => {
         bulkDeleteMutation.mutate(ids);
       },
     });
-  };
+  }, [RED, RED_DARK, bulkDeleteMutation, openConfirm]);
 
   const handleBulkDeleteClick = () => {
     const count = globalSelectedRows.length;
@@ -1841,7 +1957,7 @@ export const PhoneNumbers = () => {
     });
   };
 
-  const handleBulkEditClick = (ids) => {
+  const handleBulkEditClick = useCallback((ids) => {
     setBulkEditDialog({
       open: true,
       ids,
@@ -1849,7 +1965,7 @@ export const PhoneNumbers = () => {
       rdp_id: "",
       password_formatter_ids: [],
     });
-  };
+  }, []);
 
   const handleBulkEditSubmit = () => {
     const updateData = {};
