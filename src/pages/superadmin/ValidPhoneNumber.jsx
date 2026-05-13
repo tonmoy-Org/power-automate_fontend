@@ -73,7 +73,8 @@ const fetchPhoneCredentials = async () => {
   return response.data;
 };
 
-const bulkDeleteCredentials = async (ids) => {
+const bulkDeleteCredentials = async (target) => {
+  const ids = target.ids || target;
   const response = await axiosInstance.delete("/phone-credentials/bulk", { data: { ids } });
   return response.data;
 };
