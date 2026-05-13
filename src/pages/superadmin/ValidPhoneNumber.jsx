@@ -122,7 +122,7 @@ const downloadTxtFile = (content, filename) => {
 const generateTypeContent = (credentials, type) =>
   credentials
     .filter((cred) => cred.type === type)
-    .map((cred) => `${cred.phone}:${cred.password}`)
+    .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
     .join("\n");
 
 const generateDetailedTypeContent = (credentials, type) =>
@@ -138,6 +138,11 @@ const generateAllContent = (credentials, types) =>
   types
     .map((type) => generateTypeContent(credentials, type))
     .filter(Boolean)
+    .join("\n");
+
+const generateSpaceSeparatedContent = (credentials) =>
+  credentials
+    .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
     .join("\n");
 
 const CountryCredentialCard = memo(({
@@ -659,9 +664,26 @@ export default function ValidPhoneNumber() {
     }
   }, [credentials, uniqueTypes]);
 
+  const handleDownloadAllSpaceSeparated = useCallback(() => {
+    try {
+      const content = generateSpaceSeparatedContent(credentials);
+      if (!content) {
+        setError("No credentials to download");
+        return;
+      }
+      downloadTxtFile(
+        content,
+        `all_credentials_spaced_${new Date().toISOString().split("T")[0]}.txt`,
+      );
+      setSuccess(`Downloaded all credentials in space-separated format`);
+    } catch {
+      setError("Failed to download file");
+    }
+  }, [credentials]);
+
   const handleDownloadSingle = useCallback((credential) => {
     try {
-      const content = `${credential.phone}:${credential.password}`;
+      const content = `${credential.phone}\t${credential.password}\t${credential.type}`;
       downloadTxtFile(
         content,
         `${credential.country_code}_${credential.phone}_${credential.type}.txt`,
@@ -926,10 +948,10 @@ export default function ValidPhoneNumber() {
                   </Box>
                 </Box>
                 <Box display="flex" alignItems="center" gap={1}>
-                  <Tooltip title="Download all credentials (phone:password)">
+                  <Tooltip title="Download all credentials (phone password type)">
                     <IconButton
                       size="small"
-                      onClick={handleDownloadAllCredentials}
+                      onClick={handleDownloadAllSpaceSeparated}
                       sx={{
                         color: WARNING_COLOR,
                         backgroundColor: alpha(WARNING_COLOR, 0.1),

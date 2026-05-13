@@ -98,7 +98,7 @@ export const SuperAdminDashboard = () => {
       if (!typeCredentials.length) return;
 
       const content = typeCredentials
-        .map((cred) => `${cred.phone}:${cred.password}`)
+        .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
         .join('\n');
 
       const blob = new Blob([content], { type: 'text/plain' });
