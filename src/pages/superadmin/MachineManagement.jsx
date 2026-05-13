@@ -34,7 +34,7 @@ import axiosInstance from "../../api/axios";
 import { formatDistanceToNow } from "date-fns";
 
 // Circular Progress Component with Label
-const CircularProgressWithLabel = ({ value, index, color = "primary" }) => {
+const CircularProgressWithLabel = ({ value, left, index, color = "primary" }) => {
   const theme = useTheme();
   return (
     <Box sx={{ position: "relative", display: "inline-flex", flexDirection: "column", alignItems: "center" }}>
@@ -70,19 +70,24 @@ const CircularProgressWithLabel = ({ value, index, color = "primary" }) => {
             justifyContent: "center",
           }}
         >
-          <Typography variant="caption" component="div" sx={{ fontSize: "0.7rem", fontWeight: 700 }}>
-            {`${Math.round(value)}%`}
+          <Typography variant="caption" component="div" sx={{ fontSize: "0.6rem", fontWeight: 700 }}>
+            {`${Number(value).toFixed(2)}%`}
           </Typography>
         </Box>
       </Box>
       <Typography variant="caption" sx={{ fontSize: "0.6rem", mt: 0.5, opacity: 0.7 }}>
-        {index + 1}
+        T{index + 1}
       </Typography>
+      {left !== undefined && left > 0 && (
+        <Typography variant="caption" sx={{ fontSize: "0.6rem", fontWeight: 700, color: theme.palette.text.secondary, mt: -0.5 }}>
+          {left} left
+        </Typography>
+      )}
     </Box>
   );
 };
 
-const MachineRow = ({ machine, theme, BLUE_COLOR, GREEN_COLOR, RED_COLOR, GREY_COLOR, onDelete }) => {
+const MachineRow = ({ machine, theme, BLUE_COLOR, GREEN_COLOR, RED_COLOR, GREY_COLOR, WARNING_COLOR, onDelete, onUpdateMode }) => {
   const isOnline = machine.status === "online";
   const statusColor = isOnline ? GREEN_COLOR : GREY_COLOR;
 
@@ -157,9 +162,11 @@ const MachineRow = ({ machine, theme, BLUE_COLOR, GREEN_COLOR, RED_COLOR, GREY_C
         {/* Progress Gauges */}
         <Grid item xs={12} md={6}>
           <Box display="flex" gap={2} justifyContent="space-between" flexWrap="wrap">
-            {(machine.tasks || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).map((val, idx) => (
-              <CircularProgressWithLabel key={idx} value={val} index={idx} />
-            ))}
+            {(machine.tasks || Array(10).fill({ progress: 0, left: 0 })).map((val, idx) => {
+              const progress = typeof val === 'object' && val !== null ? val.progress : (val || 0);
+              const left = typeof val === 'object' && val !== null ? val.left : undefined;
+              return <CircularProgressWithLabel key={idx} value={progress} left={left} index={idx} />;
+            })}
           </Box>
         </Grid>
 
@@ -176,18 +183,13 @@ const MachineRow = ({ machine, theme, BLUE_COLOR, GREEN_COLOR, RED_COLOR, GREY_C
             </Box>
             
             <Tooltip title="Play">
-              <IconButton size="small" sx={{ color: GREEN_COLOR }}>
+              <IconButton size="small" sx={{ color: machine.mode === 'Normal' ? GREEN_COLOR : theme.palette.text.secondary }} onClick={() => onUpdateMode(machine._id, 'Normal')}>
                 <PlayIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Pause">
-              <IconButton size="small" sx={{ color: theme.palette.text.secondary }}>
+              <IconButton size="small" sx={{ color: machine.mode === 'Pause' ? WARNING_COLOR : theme.palette.text.secondary }} onClick={() => onUpdateMode(machine._id, 'Pause')}>
                 <PauseIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Settings">
-              <IconButton size="small">
-                <SettingsIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             <Tooltip title="Delete">
@@ -236,6 +238,37 @@ export const MachineManagement = () => {
       } catch (error) {
         console.error("Failed to delete machine:", error);
       }
+    }
+  };
+
+  const handleUpdateMode = async (id, mode) => {
+    try {
+      await axiosInstance.put(`/machines/${id}/mode`, { mode });
+      refetch();
+    } catch (error) {
+      console.error("Failed to update machine mode:", error);
+    }
+  };
+
+  const handlePauseAll = async () => {
+    const onlineMachines = machines.filter(m => m.status === 'online');
+    if (!onlineMachines.length) return;
+    try {
+      await Promise.all(onlineMachines.map(m => axiosInstance.put(`/machines/${m._id}/mode`, { mode: 'Pause' })));
+      refetch();
+    } catch (error) {
+      console.error("Failed to pause all:", error);
+    }
+  };
+
+  const handlePlayOnline = async () => {
+    const onlineMachines = machines.filter(m => m.status === 'online');
+    if (!onlineMachines.length) return;
+    try {
+      await Promise.all(onlineMachines.map(m => axiosInstance.put(`/machines/${m._id}/mode`, { mode: 'Normal' })));
+      refetch();
+    } catch (error) {
+      console.error("Failed to play online:", error);
     }
   };
 
@@ -325,6 +358,7 @@ export const MachineManagement = () => {
                 variant="outlined"
                 size="small"
                 startIcon={<PlayIcon />}
+                onClick={handlePlayOnline}
                 sx={{ borderRadius: 1.5, textTransform: 'none', fontSize: '0.75rem', color: GREEN_COLOR }}
               >
                 Play Online
@@ -333,6 +367,7 @@ export const MachineManagement = () => {
                 variant="outlined"
                 size="small"
                 startIcon={<PauseIcon />}
+                onClick={handlePauseAll}
                 sx={{ borderRadius: 1.5, textTransform: 'none', fontSize: '0.75rem' }}
               >
                 Pause All
@@ -363,7 +398,9 @@ export const MachineManagement = () => {
                 GREEN_COLOR={GREEN_COLOR}
                 RED_COLOR={RED_COLOR}
                 GREY_COLOR={GREY_COLOR}
+                WARNING_COLOR={WARNING_COLOR}
                 onDelete={handleDeleteMachine}
+                onUpdateMode={handleUpdateMode}
               />
             ))
         )}
