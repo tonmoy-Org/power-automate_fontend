@@ -60,24 +60,58 @@ import GradientButton from "../../components/ui/GradientButton";
 import OutlineButton from "../../components/ui/OutlineButton";
 import StyledTextField from "../../components/ui/StyledTextField";
 import {
-  fetchPhoneNumbers,
+  fetchIndianNumbers,
   fetchPasswordFormatters,
-  createPhoneNumber,
-  bulkCreatePhoneNumbers,
-  updatePhoneNumber,
-  deletePhoneNumber,
-  bulkDeletePhoneNumbers,
-  bulkUpdatePhoneNumberStatus,
-  bulkUpdatePhoneNumbers,
-} from "../../api/phoneNumbers";
+  createIndianNumber,
+  bulkCreateIndianNumbers,
+  updateIndianNumber,
+  deleteIndianNumber,
+  bulkDeleteIndianNumbers,
+  bulkUpdateIndianNumberStatus,
+  bulkUpdateIndianNumbers,
+} from "../../api/indianNumbers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
+
+
+const TELECOM_CIRCLES = [
+  { code: 'AP', name: 'Andhra Pradesh' },
+  { code: 'AS', name: 'Assam' },
+  { code: 'BR', name: 'Bihar & Jharkhand' },
+  { code: 'CH', name: 'Chennai' },
+  { code: 'DL', name: 'Delhi' },
+  { code: 'GJ', name: 'Gujarat' },
+  { code: 'HP', name: 'Himachal Pradesh' },
+  { code: 'HR', name: 'Haryana' },
+  { code: 'JK', name: 'Jammu & Kashmir' },
+  { code: 'KL', name: 'Kerala & Lakshadweep' },
+  { code: 'KA', name: 'Karnataka' },
+  { code: 'KO', name: 'Kolkata' },
+  { code: 'MH', name: 'Maharashtra & Goa' },
+  { code: 'MP', name: 'Madhya Pradesh & Chhattisgarh' },
+  { code: 'MU', name: 'Mumbai' },
+  { code: 'NE', name: 'North East' },
+  { code: 'OR', name: 'Odisha' },
+  { code: 'PB', name: 'Punjab' },
+  { code: 'RJ', name: 'Rajasthan' },
+  { code: 'TN', name: 'Tamil Nadu' },
+  { code: 'UE', name: 'UP (East)' },
+  { code: 'UW', name: 'UP (West)' },
+  { code: 'WB', name: 'West Bengal' }
+];
+
+const NETWORK_OPERATORS = [
+  'Airtel',
+  'Reliance Jio',
+  'Vodafone Idea'
+];
 
 // Upload limit removed for unlimited batch uploads
 const INNER_PAGE_SIZE = 50;
 
 const initialFormData = {
   country_code: "",
+  circle: "",
   numbers: "",
   password_formatter_ids: [],
   is_active: "inactive",
@@ -103,17 +137,26 @@ const parseNumbers = (raw) =>
     .map((l) => l.trim())
     .filter(Boolean);
 
-const groupByCountryCode = (items) => {
+const groupByOperatorAndCircle = (items) => {
   const map = {};
   for (const item of items) {
-    const cc = item.country_code || "Unknown";
+    const countryCode = item.country_code || "";
+    const operatorName = item.operator || "Unknown";
+    const circleName = item.circle || "Unknown";
+    const cc = `${countryCode}|||${operatorName}|||${circleName}`;
     if (!map[cc]) map[cc] = [];
     map[cc].push(item);
   }
-  return Object.entries(map).map(([country_code, items]) => ({
-    country_code,
-    items,
-  }));
+  return Object.entries(map).map(([key, items]) => {
+    const [countryCode, operatorName, circleName] = key.split('|||');
+    return {
+      operator: key,
+      countryCode: countryCode || null,
+      operatorName,
+      circleName: circleName !== "Unknown" ? circleName : null,
+      items,
+    };
+  });
 };
 
 const cellSx = { fontSize: "0.82rem", py: 1.2 };
@@ -479,7 +522,7 @@ const CountryCodeRow = memo(({
 
   useEffect(() => {
     setInnerPage(0);
-  }, [group.country_code, debouncedInnerSearch]);
+  }, [group.operator, debouncedInnerSearch]);
 
   const pagedItems = filteredItems.slice(
     innerPage * INNER_PAGE_SIZE,
@@ -613,17 +656,17 @@ const CountryCodeRow = memo(({
 
     try {
       if (innerConfirmDialog.type === "status") {
-        const result = await bulkUpdatePhoneNumberStatus(
+        const result = await bulkUpdateIndianNumberStatus(
           innerSelected,
           innerConfirmDialog.targetStatus,
         );
         setInnerSelected([]);
-        await queryClient.invalidateQueries(["phoneNumbers"]);
+        await queryClient.invalidateQueries(["indianNumbers"]);
         onSuccess(result.message);
       } else if (innerConfirmDialog.type === "delete") {
-        const result = await bulkDeletePhoneNumbers(innerSelected);
+        const result = await bulkDeleteIndianNumbers(innerSelected);
         setInnerSelected([]);
-        await queryClient.invalidateQueries(["phoneNumbers"]);
+        await queryClient.invalidateQueries(["indianNumbers"]);
         onSuccess(result.message);
       }
       closeInnerConfirm();
@@ -699,8 +742,23 @@ const CountryCodeRow = memo(({
               )}
             </IconButton>
 
+            {group.countryCode && (
+              <Chip
+                label={group.countryCode}
+                size="small"
+                sx={{
+                  backgroundColor: alpha("#10B981", 0.12),
+                  color: "#10B981",
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  height: 24,
+                  borderRadius: "6px",
+                }}
+              />
+            )}
+
             <Chip
-              label={group.country_code}
+              label={group.operatorName}
               size="small"
               sx={{
                 backgroundColor: alpha(BLUE, 0.12),
@@ -711,6 +769,20 @@ const CountryCodeRow = memo(({
                 borderRadius: "6px",
               }}
             />
+            {group.circleName && (
+              <Chip
+                label={group.circleName}
+                size="small"
+                sx={{
+                  backgroundColor: alpha("#F59E0B", 0.12),
+                  color: "#F59E0B",
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  height: 24,
+                  borderRadius: "6px",
+                }}
+              />
+            )}
 
             <Chip
               size="small"
@@ -821,7 +893,7 @@ const CountryCodeRow = memo(({
           onClick={(e) => e.stopPropagation()}
         >
           <Tooltip
-            title={`Delete all ${group.items.length} numbers in ${group.country_code}`}
+            title={`Delete all ${group.items.length} numbers in ${group.operatorName}${group.circleName ? ' - ' + group.circleName : ''}`}
             placement="top"
           >
             <IconButton
@@ -1340,7 +1412,7 @@ const CountryCodeRow = memo(({
   );
 });
 
-export const PhoneNumbers = () => {
+export const IndianNumbers = () => {
   const theme = useTheme();
   const queryClient = useQueryClient();
 
@@ -1412,15 +1484,15 @@ export const PhoneNumbers = () => {
   }, [page, rowsPerPage, debouncedSearch, statusFilter]);
 
   const {
-    data: phoneNumbersData,
+    data: indianNumbersData,
     isLoading,
     isError,
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+    queryKey: ["indianNumbers", page, rowsPerPage, debouncedSearch],
     queryFn: () =>
-      fetchPhoneNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
+      fetchIndianNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
     keepPreviousData: true,
     staleTime: 30000, // 30 seconds
     cacheTime: 600000, // 10 minutes
@@ -1434,11 +1506,11 @@ export const PhoneNumbers = () => {
   });
 
   const createMutation = useMutation({
-    mutationFn: createPhoneNumber,
+    mutationFn: createIndianNumber,
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await queryClient.invalidateQueries(["indianNumbers"]);
       await refetch();
-      setSuccess(data.message || "Phone number created successfully");
+      setSuccess(data.message || "Indian number created successfully");
       setOpenDialog(false);
       resetForm();
     },
@@ -1449,9 +1521,9 @@ export const PhoneNumbers = () => {
   });
 
   const bulkCreateMutation = useMutation({
-    mutationFn: bulkCreatePhoneNumbers,
+    mutationFn: bulkCreateIndianNumbers,
     onSuccess: async (data) => {
-      await queryClient.invalidateQueries(["phoneNumbers"]);
+      await queryClient.invalidateQueries(["indianNumbers"]);
       await refetch();
       setSuccess(data.message);
       setOpenDialog(false);
@@ -1474,14 +1546,14 @@ export const PhoneNumbers = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: updatePhoneNumber,
+    mutationFn: updateIndianNumber,
     onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
-      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
       
       if (previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           (old) => ({
             ...old,
             data: old.data.map((item) =>
@@ -1493,33 +1565,33 @@ export const PhoneNumbers = () => {
       return { previousData };
     },
     onSuccess: async (data) => {
-      setSuccess(data.message || "Phone number updated successfully");
+      setSuccess(data.message || "Indian number updated successfully");
       setOpenDialog(false);
       resetForm();
     },
     onError: (err, newData, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           context.previousData
         );
       }
       setError(err.response?.data?.message || "Failed to update phone number");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: deletePhoneNumber,
+    mutationFn: deleteIndianNumber,
     onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
-      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
       
       if (previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           (old) => ({
             ...old,
             data: old.data.filter((item) => item._id !== deletedId),
@@ -1529,13 +1601,13 @@ export const PhoneNumbers = () => {
       return { previousData };
     },
     onSuccess: async (data) => {
-      setSuccess(data.message || "Phone number deleted successfully");
+      setSuccess(data.message || "Indian number deleted successfully");
       closeConfirm();
     },
     onError: (err, deletedId, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           context.previousData
         );
       }
@@ -1543,19 +1615,19 @@ export const PhoneNumbers = () => {
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: bulkDeletePhoneNumbers,
+    mutationFn: bulkDeleteIndianNumbers,
     onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
-      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
       
       if (previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           (old) => ({
             ...old,
             data: old.data.filter((item) => !ids.includes(item._id)),
@@ -1572,7 +1644,7 @@ export const PhoneNumbers = () => {
     onError: (err, ids, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           context.previousData
         );
       }
@@ -1580,19 +1652,19 @@ export const PhoneNumbers = () => {
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const bulkStatusMutation = useMutation({
-    mutationFn: ({ ids, status }) => bulkUpdatePhoneNumberStatus(ids, status),
+    mutationFn: ({ ids, status }) => bulkUpdateIndianNumberStatus(ids, status),
     onMutate: async ({ ids, status }) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
-      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
       
       if (previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           (old) => ({
             ...old,
             data: old.data.map((item) =>
@@ -1611,7 +1683,7 @@ export const PhoneNumbers = () => {
     onError: (err, variables, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           context.previousData
         );
       }
@@ -1619,19 +1691,19 @@ export const PhoneNumbers = () => {
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: ({ ids, data }) => bulkUpdatePhoneNumbers(ids, data),
+    mutationFn: ({ ids, data }) => bulkUpdateIndianNumbers(ids, data),
     onMutate: async ({ ids, data: updateData }) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneNumbers"] });
-      const previousData = queryClient.getQueryData(["phoneNumbers", page, rowsPerPage, debouncedSearch]);
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
       
       if (previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           (old) => ({
             ...old,
             data: old.data.map((item) =>
@@ -1650,7 +1722,7 @@ export const PhoneNumbers = () => {
     onError: (err, variables, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ["phoneNumbers", page, rowsPerPage, debouncedSearch],
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
           context.previousData
         );
       }
@@ -1658,20 +1730,20 @@ export const PhoneNumbers = () => {
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneNumbers"] });
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
-  const allPhoneNumbers = useMemo(() => phoneNumbersData?.data || [], [phoneNumbersData]);
+  const allIndianNumbers = useMemo(() => indianNumbersData?.data || [], [indianNumbersData]);
   const passwordFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
 
   const filteredNumbers = useMemo(() => 
     statusFilter === "all"
-      ? allPhoneNumbers
-      : allPhoneNumbers.filter((item) => item.is_active === statusFilter)
-  , [allPhoneNumbers, statusFilter]);
+      ? allIndianNumbers
+      : allIndianNumbers.filter((item) => item.is_active === statusFilter)
+  , [allIndianNumbers, statusFilter]);
 
-  const groupedNumbers = useMemo(() => groupByCountryCode(filteredNumbers), [filteredNumbers]);
+  const groupedNumbers = useMemo(() => groupByOperatorAndCircle(filteredNumbers), [filteredNumbers]);
   
   const paginatedGroups = useMemo(() => 
     groupedNumbers.slice(
@@ -1692,8 +1764,8 @@ export const PhoneNumbers = () => {
   , [globalSelectedRows, globalAllSelected]);
 
   const globalSelectedItems = useMemo(
-    () => allPhoneNumbers.filter((n) => globalSelectedRows.includes(n._id)),
-    [allPhoneNumbers, globalSelectedRows],
+    () => allIndianNumbers.filter((n) => globalSelectedRows.includes(n._id)),
+    [allIndianNumbers, globalSelectedRows],
   );
   
   const statusSelectedCounts = useMemo(() => ({
@@ -1704,7 +1776,7 @@ export const PhoneNumbers = () => {
 
   const formatterGroupsData = useMemo(() => {
     return passwordFormatters.reduce((acc, f) => {
-      const cc = f.country_code || 'Other';
+      const cc = f.operator || 'Other';
       if (!acc[cc]) acc[cc] = [];
       acc[cc].push(f);
       return acc;
@@ -1770,7 +1842,7 @@ export const PhoneNumbers = () => {
       }));
     } else if (type === 'country' && countryCode) {
       const countryIds = passwordFormatters
-        .filter(f => String(f.country_code || 'Other') === countryCode)
+        .filter(f => String(f.operator || 'Other') === countryCode)
         .map(f => String(f._id));
       
       if (countryIds.length === 0) return;
@@ -1797,9 +1869,9 @@ export const PhoneNumbers = () => {
     setFormData((prev) => ({ ...prev, password_formatter_ids: cleanedVals }));
   };
 
-  const getSelectedFormatterIds = (phoneNumber) => {
-    if (!Array.isArray(phoneNumber?.password_formatters)) return [];
-    return phoneNumber.password_formatters
+  const getSelectedFormatterIds = (indianNumber) => {
+    if (!Array.isArray(indianNumber?.password_formatters)) return [];
+    return indianNumber.password_formatters
       .map((ef) => {
         const m = matchFormatterToMaster(ef, passwordFormatters);
         return m ? String(m._id) : null;
@@ -1811,6 +1883,8 @@ export const PhoneNumbers = () => {
     if (number) {
       setSelectedNumber(number);
       setFormData({
+        operator: number.operator || "",
+        circle: number.circle || "",
         country_code: number.country_code || "",
         numbers: number.number || "",
         password_formatter_ids:
@@ -1862,7 +1936,7 @@ export const PhoneNumbers = () => {
         <>
           Are you sure you want to delete{" "}
           <strong>
-            "{item.country_code} {item.number}"
+            "{item.operator} {item.number}"
           </strong>
           ? This action cannot be undone.
         </>
@@ -1887,7 +1961,7 @@ export const PhoneNumbers = () => {
           <strong>
             {group.items.length} number{group.items.length !== 1 ? "s" : ""}
           </strong>{" "}
-          under <strong>{group.country_code}</strong>? This cannot be undone.
+          under <strong>{group.operator}</strong>? This cannot be undone.
         </>
       ),
       confirmLabel: `Delete ${group.items.length} Numbers`,
@@ -2025,6 +2099,8 @@ export const PhoneNumbers = () => {
       updateMutation.mutate({
         id: selectedNumber._id,
         data: {
+          operator: formData.operator,
+          circle: formData.circle,
           country_code: formData.country_code,
           number: formData.numbers.trim(),
           password_formatters: selectedFormatters,
@@ -2052,6 +2128,8 @@ export const PhoneNumbers = () => {
 
       if (nums.length > 1) {
         bulkCreateMutation.mutate({
+          operator: formData.operator,
+          circle: formData.circle,
           country_code: formData.country_code,
           numbers: nums,
           password_formatters: selectedFormatters,
@@ -2059,6 +2137,8 @@ export const PhoneNumbers = () => {
         });
       } else {
         createMutation.mutate({
+          operator: formData.operator,
+          circle: formData.circle,
           country_code: formData.country_code,
           number: nums[0],
           password_formatters: selectedFormatters,
@@ -2118,7 +2198,7 @@ export const PhoneNumbers = () => {
   return (
     <Box>
       <Helmet>
-        <title>Phone Numbers | Power Automate</title>
+        <title>Indian Numbers | Power Automate</title>
       </Helmet>
 
       <Box
@@ -2140,7 +2220,7 @@ export const PhoneNumbers = () => {
               WebkitTextFillColor: "transparent",
             }}
           >
-            Phone Numbers
+            Indian Numbers
           </Typography>
           <Typography
             variant="caption"
@@ -2158,7 +2238,7 @@ export const PhoneNumbers = () => {
             sx={{ fontSize: "0.8rem", py: 0.6, px: 1.5, height: 36 }}
             disabled={isMutating}
           >
-            Add Phone Numbers
+            Add Indian Numbers
           </GradientButton>
         </Box>
       </Box>
@@ -2332,7 +2412,7 @@ export const PhoneNumbers = () => {
           minHeight: 380,
         }}
       >
-        {isLoading && !phoneNumbersData && (
+        {isLoading && !indianNumbersData && (
           <LinearProgress
             sx={{
               borderRadius: "2px 2px 0 0",
@@ -2381,7 +2461,7 @@ export const PhoneNumbers = () => {
                   borderBottom: `2px solid ${alpha(BLUE, 0.5)}`,
                 }}
               >
-                Country Code
+                Operator
               </TableCell>
               <TableCell
                 sx={{
@@ -2435,7 +2515,7 @@ export const PhoneNumbers = () => {
 
                 return (
                   <CountryCodeRow
-                    key={group.country_code}
+                    key={group.operator}
                     group={group}
                     globalSelectedRows={globalSelectedRows}
                     onGlobalSelectGroup={handleSelectGroupAll}
@@ -2495,18 +2575,50 @@ export const PhoneNumbers = () => {
             borderBottom: `1px solid ${theme.palette.divider}`,
           }}
         >
-          {selectedNumber ? "Edit Phone Number" : "Add Phone Numbers"}
+          {selectedNumber ? "Edit Indian Number" : "Add Indian Numbers"}
         </DialogTitle>
         <DialogContent sx={{ px: 3, py: 2.5 }}>
           <Grid container spacing={2.5} sx={{ mt: 1.5 }}>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Operator</InputLabel>
+                <Select
+                  label="Operator"
+                  name="operator"
+                  value={formData.operator}
+                  onChange={handleInputChange}
+                  required
+                >
+                  {NETWORK_OPERATORS.map((op) => (
+                    <MenuItem key={op} value={op}>{op}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Circle</InputLabel>
+                <Select
+                  label="Circle"
+                  name="circle"
+                  value={formData.circle}
+                  onChange={handleInputChange}
+                  required
+                >
+                  {TELECOM_CIRCLES.map((circle) => (
+                    <MenuItem key={circle.name} value={circle.name}>{circle.name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, md: 4 }}>
               <StyledTextField
                 fullWidth
                 label="Country Code"
                 name="country_code"
                 value={formData.country_code}
                 onChange={handleInputChange}
-                placeholder="+91"
+                placeholder="e.g. +91"
                 size="small"
                 required
               />
@@ -2687,10 +2799,10 @@ export const PhoneNumbers = () => {
                 fullWidth
                 label={
                   selectedNumber
-                    ? "Phone Number"
+                    ? "Indian Number"
                     : bulkCreateMutation.isLoading
                       ? `Creating ${parsedCount} numbers...`
-                      : `Phone Numbers (one per line)${parsedCount > 0 ? ` — ${parsedCount} detected` : ""}`
+                      : `Indian Numbers (one per line)${parsedCount > 0 ? ` — ${parsedCount} detected` : ""}`
                 }
                 name="numbers"
                 value={formData.numbers}
@@ -2730,7 +2842,7 @@ export const PhoneNumbers = () => {
                         </span>
                       ))}
                       {parsedCount > 0 &&
-                        // No upload limit enforced
+                        // No upload limit enforced &&
                         duplicateNumbers.length === 0 && (
                           <span style={{ color: GREEN, display: "block" }}>
                             ✓ Ready to upload {parsedCount} number
@@ -2835,7 +2947,7 @@ export const PhoneNumbers = () => {
             onClick={handleSubmit}
             variant="contained"
             disabled={
-              !formData.country_code ||
+              !formData.operator || !formData.circle || !formData.country_code ||
               !formData.numbers.trim() ||
               isMutating ||
               validationWarnings.length > 0 ||
@@ -3091,4 +3203,4 @@ export const PhoneNumbers = () => {
   );
 };
 
-export default PhoneNumbers;
+export default IndianNumbers;
