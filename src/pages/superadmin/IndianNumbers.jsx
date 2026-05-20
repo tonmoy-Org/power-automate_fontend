@@ -38,6 +38,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   InputAdornment,
+  Divider,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -111,6 +112,7 @@ const INNER_PAGE_SIZE = 50;
 
 const initialFormData = {
   country_code: "",
+  operator: "",
   circle: "",
   numbers: "",
   password_formatter_ids: [],
@@ -511,7 +513,6 @@ const CountryCodeRow = memo(({
 
   const filteredItems = useMemo(() => {
     if (!debouncedInnerSearch) return group.items;
-
     const searchLower = debouncedInnerSearch.toLowerCase();
     return group.items.filter((item) => {
       const numberMatch = item.number.toLowerCase().includes(searchLower);
@@ -653,7 +654,6 @@ const CountryCodeRow = memo(({
 
   const confirmInnerAction = async () => {
     setInnerConfirmDialog((prev) => ({ ...prev, loading: true }));
-
     try {
       if (innerConfirmDialog.type === "status") {
         const result = await bulkUpdateIndianNumberStatus(
@@ -1136,7 +1136,7 @@ const CountryCodeRow = memo(({
                       "Number",
                       "Password Formatters",
                       "Limit",
-                      "RDP ",
+                      "RDP",
                       "Status",
                       "Actions",
                     ].map((label, i) => (
@@ -1257,28 +1257,19 @@ const CountryCodeRow = memo(({
                             </Box>
                           </TableCell>
                           <TableCell sx={{ ...cellSx, pl: 2 }}>
-                            <Typography
+                            <Chip
+                              label={item.limit}
+                              size="small"
                               sx={{
-                                fontSize: "0.82rem",
-                                fontFamily: "monospace",
-                                color: TEXT,
-                                letterSpacing: "0.02em",
+                                backgroundColor: alpha(BLUE, 0.1),
+                                color: BLUE,
+                                fontSize: "0.68rem",
+                                height: 22,
+                                borderRadius: "4px",
+                                fontWeight: 600,
+                                "& .MuiChip-label": { px: 0.8 },
                               }}
-                            >
-                              <Chip
-                                label={item.limit}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(BLUE, 0.1),
-                                  color: BLUE,
-                                  fontSize: "0.68rem",
-                                  height: 22,
-                                  borderRadius: "4px",
-                                  fontWeight: 600,
-                                  "& .MuiChip-label": { px: 0.8 },
-                                }}
-                              />
-                            </Typography>
+                            />
                           </TableCell>
                           <TableCell sx={{ ...cellSx, pl: 2 }}>
                             <Typography
@@ -1494,15 +1485,15 @@ export const IndianNumbers = () => {
     queryFn: () =>
       fetchIndianNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
     keepPreviousData: true,
-    staleTime: 30000, // 30 seconds
-    cacheTime: 600000, // 10 minutes
+    staleTime: 30000,
+    cacheTime: 600000,
   });
 
   const { data: formattersData, isLoading: formattersLoading } = useQuery({
     queryKey: ["passwordFormatters"],
     queryFn: fetchPasswordFormatters,
-    staleTime: 300000, // 5 minutes
-    cacheTime: 3600000, // 1 hour
+    staleTime: 300000,
+    cacheTime: 3600000,
   });
 
   const createMutation = useMutation({
@@ -1532,13 +1523,9 @@ export const IndianNumbers = () => {
     onError: (err) => {
       const response = err.response?.data;
       if (response?.existingNumbers) {
-        setError(
-          `Numbers already exist: ${response.existingNumbers.join(", ")}`,
-        );
+        setError(`Numbers already exist: ${response.existingNumbers.join(", ")}`);
       } else if (response?.duplicates) {
-        setError(
-          `Duplicate numbers in request: ${response.duplicates.join(", ")}`,
-        );
+        setError(`Duplicate numbers in request: ${response.duplicates.join(", ")}`);
       } else {
         setError(response?.message || "Failed to create phone numbers");
       }
@@ -1550,7 +1537,6 @@ export const IndianNumbers = () => {
     onMutate: async (newData) => {
       await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
       const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      
       if (previousData) {
         queryClient.setQueryData(
           ["indianNumbers", page, rowsPerPage, debouncedSearch],
@@ -1588,7 +1574,6 @@ export const IndianNumbers = () => {
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
       const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      
       if (previousData) {
         queryClient.setQueryData(
           ["indianNumbers", page, rowsPerPage, debouncedSearch],
@@ -1624,7 +1609,6 @@ export const IndianNumbers = () => {
     onMutate: async (ids) => {
       await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
       const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      
       if (previousData) {
         queryClient.setQueryData(
           ["indianNumbers", page, rowsPerPage, debouncedSearch],
@@ -1661,7 +1645,6 @@ export const IndianNumbers = () => {
     onMutate: async ({ ids, status }) => {
       await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
       const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      
       if (previousData) {
         queryClient.setQueryData(
           ["indianNumbers", page, rowsPerPage, debouncedSearch],
@@ -1700,7 +1683,6 @@ export const IndianNumbers = () => {
     onMutate: async ({ ids, data: updateData }) => {
       await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
       const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      
       if (previousData) {
         queryClient.setQueryData(
           ["indianNumbers", page, rowsPerPage, debouncedSearch],
@@ -1737,15 +1719,15 @@ export const IndianNumbers = () => {
   const allIndianNumbers = useMemo(() => indianNumbersData?.data || [], [indianNumbersData]);
   const passwordFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
 
-  const filteredNumbers = useMemo(() => 
+  const filteredNumbers = useMemo(() =>
     statusFilter === "all"
       ? allIndianNumbers
       : allIndianNumbers.filter((item) => item.is_active === statusFilter)
   , [allIndianNumbers, statusFilter]);
 
   const groupedNumbers = useMemo(() => groupByOperatorAndCircle(filteredNumbers), [filteredNumbers]);
-  
-  const paginatedGroups = useMemo(() => 
+
+  const paginatedGroups = useMemo(() =>
     groupedNumbers.slice(
       page * rowsPerPage,
       page * rowsPerPage + rowsPerPage,
@@ -1753,13 +1735,13 @@ export const IndianNumbers = () => {
   , [groupedNumbers, page, rowsPerPage]);
 
   const allVisibleIds = useMemo(() => filteredNumbers.map((item) => item._id), [filteredNumbers]);
-  
-  const globalAllSelected = useMemo(() => 
+
+  const globalAllSelected = useMemo(() =>
     allVisibleIds.length > 0 &&
     allVisibleIds.every((id) => globalSelectedRows.includes(id))
   , [allVisibleIds, globalSelectedRows]);
-  
-  const globalSomeSelected = useMemo(() => 
+
+  const globalSomeSelected = useMemo(() =>
     globalSelectedRows.length > 0 && !globalAllSelected
   , [globalSelectedRows, globalAllSelected]);
 
@@ -1767,23 +1749,24 @@ export const IndianNumbers = () => {
     () => allIndianNumbers.filter((n) => globalSelectedRows.includes(n._id)),
     [allIndianNumbers, globalSelectedRows],
   );
-  
+
   const statusSelectedCounts = useMemo(() => ({
     inactive: globalSelectedItems.filter((n) => n.is_active === "inactive").length,
     running: globalSelectedItems.filter((n) => n.is_active === "running").length,
     completed: globalSelectedItems.filter((n) => n.is_active === "completed").length,
   }), [globalSelectedItems]);
 
+  // group formatters by country_code
   const formatterGroupsData = useMemo(() => {
     return passwordFormatters.reduce((acc, f) => {
-      const cc = f.operator || 'Other';
+      const cc = f.country_code || "Other";
       if (!acc[cc]) acc[cc] = [];
       acc[cc].push(f);
       return acc;
     }, {});
   }, [passwordFormatters]);
 
-  const sortedFormatterCountryCodes = useMemo(() => 
+  const sortedFormatterCountryCodes = useMemo(() =>
     Object.keys(formatterGroupsData).sort()
   , [formatterGroupsData]);
 
@@ -1818,8 +1801,7 @@ export const IndianNumbers = () => {
   };
 
   const checkForDuplicates = (numbers) => {
-    const seen = new Set(),
-      dups = new Set();
+    const seen = new Set(), dups = new Set();
     numbers.forEach((n) => (seen.has(n) ? dups.add(n) : seen.add(n)));
     return Array.from(dups);
   };
@@ -1831,27 +1813,34 @@ export const IndianNumbers = () => {
       setDuplicateNumbers(checkForDuplicates(parseNumbers(value)));
   };
 
+  // filter formatters by country_code
   const handleGroupSelection = (type, countryCode = null) => {
     const allIds = passwordFormatters.map((f) => String(f._id));
-    
-    if (type === 'all') {
-      const allSelected = allIds.every(id => formData.password_formatter_ids.includes(id));
+
+    if (type === "all") {
+      const allSelected = allIds.every((id) =>
+        formData.password_formatter_ids.includes(id)
+      );
       setFormData((prev) => ({
         ...prev,
         password_formatter_ids: allSelected ? [] : allIds,
       }));
-    } else if (type === 'country' && countryCode) {
+    } else if (type === "country" && countryCode) {
       const countryIds = passwordFormatters
-        .filter(f => String(f.operator || 'Other') === countryCode)
-        .map(f => String(f._id));
-      
+        .filter((f) => String(f.country_code || "Other") === countryCode)
+        .map((f) => String(f._id));
+
       if (countryIds.length === 0) return;
 
       setFormData((prev) => {
-        const alreadyHasAll = countryIds.every(id => prev.password_formatter_ids.includes(id));
+        const alreadyHasAll = countryIds.every((id) =>
+          prev.password_formatter_ids.includes(id)
+        );
         let nextIds;
         if (alreadyHasAll) {
-          nextIds = prev.password_formatter_ids.filter(id => !countryIds.includes(id));
+          nextIds = prev.password_formatter_ids.filter(
+            (id) => !countryIds.includes(id)
+          );
         } else {
           nextIds = [...new Set([...prev.password_formatter_ids, ...countryIds])];
         }
@@ -1862,10 +1851,10 @@ export const IndianNumbers = () => {
 
   const handleFormatterSelectChange = (event) => {
     const { value } = event.target;
-    // This is now only for individual selections (if they were enabled)
-    // or as a fallback. Special items are handled by onClick.
     const vals = Array.isArray(value) ? value : [value];
-    const cleanedVals = vals.filter(v => typeof v === 'string' && !v.startsWith("select-")).map(String);
+    const cleanedVals = vals
+      .filter((v) => typeof v === "string" && !v.startsWith("select-"))
+      .map(String);
     setFormData((prev) => ({ ...prev, password_formatter_ids: cleanedVals }));
   };
 
@@ -1948,7 +1937,7 @@ export const IndianNumbers = () => {
         deleteMutation.mutate(item._id);
       },
     });
-  }, [RED, RED_DARK, deleteMutation, openConfirm]);
+  }, [RED, RED_DARK, deleteMutation]);
 
   const handleDeleteGroupClick = useCallback((group) => {
     openConfirm({
@@ -1961,7 +1950,7 @@ export const IndianNumbers = () => {
           <strong>
             {group.items.length} number{group.items.length !== 1 ? "s" : ""}
           </strong>{" "}
-          under <strong>{group.operator}</strong>? This cannot be undone.
+          under <strong>{group.operatorName}</strong>? This cannot be undone.
         </>
       ),
       confirmLabel: `Delete ${group.items.length} Numbers`,
@@ -1972,7 +1961,7 @@ export const IndianNumbers = () => {
         bulkDeleteMutation.mutate(ids);
       },
     });
-  }, [RED, RED_DARK, bulkDeleteMutation, openConfirm]);
+  }, [RED, RED_DARK, bulkDeleteMutation]);
 
   const handleBulkDeleteClick = () => {
     const count = globalSelectedRows.length;
@@ -2062,25 +2051,20 @@ export const IndianNumbers = () => {
   };
 
   const handleBulkFormatterChange = (event) => {
-    const {
-      target: { value },
-    } = event;
-    if (Array.isArray(value) && value.some(v => String(v).startsWith('select-country-'))) {
+    const { target: { value } } = event;
+    if (Array.isArray(value) && value.some((v) => String(v).startsWith("select-country-"))) {
       return;
     }
     setBulkEditDialog((prev) => ({
       ...prev,
-      password_formatter_ids: typeof value === "string" ? value.split(",") : value,
+      password_formatter_ids:
+        typeof value === "string" ? value.split(",") : value,
     }));
   };
 
   const validateNumbersInput = (numbers) => {
     const nums = parseNumbers(numbers);
     const warnings = [];
-    if (nums.length > MAX_NUMBERS_PER_UPLOAD)
-      warnings.push(
-        `Maximum ${MAX_NUMBERS_PER_UPLOAD} numbers allowed. You have ${nums.length}.`,
-      );
     return { warnings };
   };
 
@@ -2119,12 +2103,6 @@ export const IndianNumbers = () => {
         setError(`Remove duplicates first: ${duplicateNumbers.join(", ")}`);
         return;
       }
-      if (nums.length > MAX_NUMBERS_PER_UPLOAD) {
-        setError(
-          `Max ${MAX_NUMBERS_PER_UPLOAD} numbers at once. You entered ${nums.length}.`,
-        );
-        return;
-      }
 
       if (nums.length > 1) {
         bulkCreateMutation.mutate({
@@ -2159,12 +2137,11 @@ export const IndianNumbers = () => {
     updateMutation.isLoading ||
     bulkCreateMutation.isLoading;
 
-  // Updated MenuProps with maxHeight for full formatter display
   const MenuProps = {
     PaperProps: {
       style: {
-        maxHeight: "70vh", // Full viewport height minus some margin
-        width: 350,
+        maxHeight: "70vh",
+        width: 450,
         borderRadius: "8px",
         boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
       },
@@ -2253,10 +2230,7 @@ export const IndianNumbers = () => {
           py={1}
           sx={{
             borderRadius: 1.5,
-            backgroundColor: alpha(
-              BLUE,
-              theme.palette.mode === "dark" ? 0.1 : 0.05,
-            ),
+            backgroundColor: alpha(BLUE, theme.palette.mode === "dark" ? 0.1 : 0.05),
             border: `1px solid ${alpha(BLUE, 0.2)}`,
             flexWrap: "wrap",
           }}
@@ -2350,7 +2324,7 @@ export const IndianNumbers = () => {
       <Box mb={2.5} display="flex" gap={1.5} alignItems="center">
         <StyledTextField
           fullWidth
-          placeholder="Search by number, RDP ID or country code..."
+          placeholder="Search by number, RDP ID or operator..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
@@ -2379,17 +2353,10 @@ export const IndianNumbers = () => {
               All
             </MenuItem>
             {STATUS_ENUM.map((status) => (
-              <MenuItem
-                key={status}
-                value={status}
-                sx={{ fontSize: "0.83rem" }}
-              >
+              <MenuItem key={status} value={status} sx={{ fontSize: "0.83rem" }}>
                 <Box display="flex" alignItems="center" gap={1}>
                   {React.createElement(getStatusIcon(status), {
-                    sx: {
-                      fontSize: "0.85rem",
-                      color: STATUS_COLORS[status].color,
-                    },
+                    sx: { fontSize: "0.85rem", color: STATUS_COLORS[status].color },
                   })}
                   {getStatusLabel(status)}
                 </Box>
@@ -2439,10 +2406,7 @@ export const IndianNumbers = () => {
                 padding="checkbox"
                 sx={{ pl: 1.5, borderBottom: `2px solid ${alpha(BLUE, 0.5)}` }}
               >
-                <Tooltip
-                  title="Select all for global bulk operations"
-                  placement="top"
-                >
+                <Tooltip title="Select all for global bulk operations" placement="top">
                   <Checkbox
                     size="small"
                     checked={globalAllSelected}
@@ -2499,20 +2463,18 @@ export const IndianNumbers = () => {
                     sx={{ fontSize: "0.83rem", color: alpha(TEXT, 0.45) }}
                   >
                     {debouncedSearch || statusFilter !== "all"
-                      ? `No phone numbers found matching "${debouncedSearch || 'filters'}"`
+                      ? `No phone numbers found matching "${debouncedSearch || "filters"}"`
                       : "No phone numbers yet. Add one to get started."}
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
               paginatedGroups.map((group, idx) => {
-                // Calculate global start index for this group
                 let groupStartIndex = 0;
                 const absoluteGroupIdx = page * rowsPerPage + idx;
                 for (let i = 0; i < absoluteGroupIdx; i++) {
                   groupStartIndex += groupedNumbers[i].items.length;
                 }
-
                 return (
                   <CountryCodeRow
                     key={group.operator}
@@ -2546,7 +2508,7 @@ export const IndianNumbers = () => {
             setRowsPerPage(parseInt(e.target.value, 10));
             setPage(0);
           }}
-          labelRowsPerPage="Country codes per page:"
+          labelRowsPerPage="Groups per page:"
           sx={{
             borderTop: `1px solid ${theme.palette.divider}`,
             "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
@@ -2555,6 +2517,7 @@ export const IndianNumbers = () => {
         />
       </TableContainer>
 
+      {/* Add / Edit Dialog */}
       <Dialog
         open={openDialog}
         onClose={() => {
@@ -2579,13 +2542,14 @@ export const IndianNumbers = () => {
         </DialogTitle>
         <DialogContent sx={{ px: 3, py: 2.5 }}>
           <Grid container spacing={2.5} sx={{ mt: 1.5 }}>
+            {/* Operator */}
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Operator</InputLabel>
                 <Select
                   label="Operator"
                   name="operator"
-                  value={formData.operator}
+                  value={formData.operator || ""}
                   onChange={handleInputChange}
                   required
                 >
@@ -2595,13 +2559,14 @@ export const IndianNumbers = () => {
                 </Select>
               </FormControl>
             </Grid>
+            {/* Circle */}
             <Grid size={{ xs: 12, md: 4 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Circle</InputLabel>
                 <Select
                   label="Circle"
                   name="circle"
-                  value={formData.circle}
+                  value={formData.circle || ""}
                   onChange={handleInputChange}
                   required
                 >
@@ -2611,6 +2576,7 @@ export const IndianNumbers = () => {
                 </Select>
               </FormControl>
             </Grid>
+            {/* Country Code */}
             <Grid size={{ xs: 12, md: 4 }}>
               <StyledTextField
                 fullWidth
@@ -2623,6 +2589,7 @@ export const IndianNumbers = () => {
                 required
               />
             </Grid>
+
             {selectedNumber && (
               <Grid size={{ xs: 12, md: 6 }}>
                 <FormControl fullWidth size="small">
@@ -2631,25 +2598,15 @@ export const IndianNumbers = () => {
                     value={formData.is_active}
                     label="Status"
                     onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        is_active: e.target.value,
-                      }))
+                      setFormData((prev) => ({ ...prev, is_active: e.target.value }))
                     }
                     sx={{ fontSize: "0.83rem" }}
                   >
                     {STATUS_ENUM.map((status) => (
-                      <MenuItem
-                        key={status}
-                        value={status}
-                        sx={{ fontSize: "0.83rem" }}
-                      >
+                      <MenuItem key={status} value={status} sx={{ fontSize: "0.83rem" }}>
                         <Box display="flex" alignItems="center" gap={1}>
                           {React.createElement(getStatusIcon(status), {
-                            sx: {
-                              fontSize: "0.85rem",
-                              color: STATUS_COLORS[status].color,
-                            },
+                            sx: { fontSize: "0.85rem", color: STATUS_COLORS[status].color },
                           })}
                           {getStatusLabel(status)}
                         </Box>
@@ -2701,6 +2658,8 @@ export const IndianNumbers = () => {
                 />
               </Grid>
             )}
+
+            {/* Password Formatters with proper selection */}
             <Grid size={{ xs: 12 }}>
               <FormControl fullWidth size="small">
                 <InputLabel>Password Formatters</InputLabel>
@@ -2710,32 +2669,20 @@ export const IndianNumbers = () => {
                   onChange={handleFormatterSelectChange}
                   input={<OutlinedInput label="Password Formatters" />}
                   renderValue={(selected) => (
-                    <Box display="flex" flexWrap="wrap" gap={0.5}>
-                      {selected.map((val) => {
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(Array.isArray(selected) ? selected : []).map((val) => {
                         const f = passwordFormatters.find(
-                          (x) => String(x._id) === val,
+                          (x) => String(x._id) === String(val),
                         );
-                        return f ? (
+                        if (!f) return null;
+                        return (
                           <Chip
-                            key={val}
+                            key={String(val)}
                             label={formatFormatterLabel(f)}
                             size="small"
                             sx={{
                               backgroundColor: alpha(GREEN, 0.1),
                               color: GREEN,
-                              fontSize: "0.68rem",
-                              height: 22,
-                              borderRadius: "4px",
-                            }}
-                          />
-                        ) : (
-                          <Chip
-                            key={val}
-                            label="Unknown"
-                            size="small"
-                            sx={{
-                              backgroundColor: alpha(RED, 0.1),
-                              color: RED,
                               fontSize: "0.68rem",
                               height: 22,
                               borderRadius: "4px",
@@ -2754,37 +2701,47 @@ export const IndianNumbers = () => {
                     </MenuItem>
                   ) : (
                     <>
-                      {/* Grouped Select Options */}
-                      {sortedFormatterCountryCodes.map(cc => {
-                        const countryIds = formatterGroupsData[cc].map(f => String(f._id));
-                        const isAllSelected = countryIds.every(id => formData.password_formatter_ids.includes(id));
-                        const isSomeSelected = countryIds.some(id => formData.password_formatter_ids.includes(id)) && !isAllSelected;
+                      {/* Group selection headers */}
+                      {sortedFormatterCountryCodes.map((cc) => {
+                        const countryIds = formatterGroupsData[cc].map((f) => String(f._id));
+                        const isAllSelected = countryIds.every((id) =>
+                          formData.password_formatter_ids.includes(id)
+                        );
+                        const isSomeSelected =
+                          countryIds.some((id) =>
+                            formData.password_formatter_ids.includes(id)
+                          ) && !isAllSelected;
 
                         return (
-                          <MenuItem 
-                            key={`group-${cc}`} 
-                            value={`select-country-${cc}`} 
+                          <MenuItem
+                            key={`group-${cc}`}
+                            value={`select-country-${cc}`}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleGroupSelection('country', cc);
+                              handleGroupSelection("country", cc);
                             }}
-                            sx={{ 
-                              fontSize: "0.83rem", 
+                            sx={{
+                              fontSize: "0.83rem",
                               fontWeight: 700,
                               backgroundColor: alpha(GREEN, 0.05),
-                              '&:hover': { backgroundColor: alpha(GREEN, 0.1) }
+                              "&:hover": { backgroundColor: alpha(GREEN, 0.1) },
+                              borderBottom: `1px solid ${alpha(TEXT, 0.1)}`,
                             }}
                           >
                             <Checkbox
                               size="small"
                               checked={isAllSelected}
                               indeterminate={isSomeSelected}
-                              sx={{ color: GREEN, '&.Mui-checked': { color: GREEN } }}
+                              sx={{ color: GREEN, "&.Mui-checked": { color: GREEN } }}
                             />
                             <ListItemText
-                              primary={`Select All for ${cc}`}
-                              primaryTypographyProps={{ fontSize: "0.83rem", fontWeight: 700, color: GREEN }}
+                              primary={`Select All - ${cc}`}
+                              primaryTypographyProps={{
+                                fontSize: "0.83rem",
+                                fontWeight: 700,
+                                color: GREEN,
+                              }}
                             />
                           </MenuItem>
                         );
@@ -2794,6 +2751,8 @@ export const IndianNumbers = () => {
                 </Select>
               </FormControl>
             </Grid>
+
+            {/* Numbers textarea */}
             <Grid size={{ xs: 12 }}>
               <StyledTextField
                 fullWidth
@@ -2817,22 +2776,13 @@ export const IndianNumbers = () => {
                 minRows={selectedNumber ? 1 : 5}
                 maxRows={12}
                 size="small"
-                error={
-                  validationWarnings.length > 0 || duplicateNumbers.length > 0
-                }
+                error={validationWarnings.length > 0 || duplicateNumbers.length > 0}
                 required={!selectedNumber}
                 helperText={
-                  !selectedNumber &&
-                  !bulkCreateMutation.isLoading && (
+                  !selectedNumber && !bulkCreateMutation.isLoading && (
                     <>
                       {duplicateNumbers.length > 0 && (
-                        <span
-                          style={{
-                            color: RED,
-                            display: "block",
-                            marginBottom: "4px",
-                          }}
-                        >
+                        <span style={{ color: RED, display: "block", marginBottom: "4px" }}>
                           Duplicate numbers found: {duplicateNumbers.join(", ")}
                         </span>
                       )}
@@ -2841,14 +2791,11 @@ export const IndianNumbers = () => {
                           {w}
                         </span>
                       ))}
-                      {parsedCount > 0 &&
-                        // No upload limit enforced &&
-                        duplicateNumbers.length === 0 && (
-                          <span style={{ color: GREEN, display: "block" }}>
-                            ✓ Ready to upload {parsedCount} number
-                            {parsedCount > 1 ? "s" : ""}
-                          </span>
-                        )}
+                      {parsedCount > 0 && duplicateNumbers.length === 0 && (
+                        <span style={{ color: GREEN, display: "block" }}>
+                          ✓ Ready to upload {parsedCount} number{parsedCount > 1 ? "s" : ""}
+                        </span>
+                      )}
                     </>
                   )
                 }
@@ -2858,17 +2805,15 @@ export const IndianNumbers = () => {
               />
             </Grid>
 
-            {!selectedNumber &&
-              !bulkCreateMutation.isLoading &&
-              duplicateNumbers.length > 0 && (
-                <Grid size={{ xs: 12 }}>
-                  <DuplicateNumbersWarning
-                    duplicates={duplicateNumbers}
-                    onRemoveAll={removeDuplicates}
-                    onKeepAll={() => setDuplicateNumbers([])}
-                  />
-                </Grid>
-              )}
+            {!selectedNumber && !bulkCreateMutation.isLoading && duplicateNumbers.length > 0 && (
+              <Grid size={{ xs: 12 }}>
+                <DuplicateNumbersWarning
+                  duplicates={duplicateNumbers}
+                  onRemoveAll={removeDuplicates}
+                  onKeepAll={() => setDuplicateNumbers([])}
+                />
+              </Grid>
+            )}
 
             {bulkCreateMutation.isLoading && (
               <Grid size={{ xs: 12 }}>
@@ -2886,9 +2831,7 @@ export const IndianNumbers = () => {
                     justifyContent="space-between"
                     mb={1}
                   >
-                    <Typography
-                      sx={{ fontSize: "0.78rem", fontWeight: 600, color: TEXT }}
-                    >
+                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: TEXT }}>
                       Creating {parsedCount} numbers...
                     </Typography>
                     <CircularProgress size={20} />
@@ -2898,30 +2841,25 @@ export const IndianNumbers = () => {
                       height: 6,
                       borderRadius: 3,
                       backgroundColor: alpha(BLUE, 0.12),
-                      "& .MuiLinearProgress-bar": {
-                        borderRadius: 3,
-                        backgroundColor: BLUE,
-                      },
+                      "& .MuiLinearProgress-bar": { borderRadius: 3, backgroundColor: BLUE },
                     }}
                   />
                 </Box>
               </Grid>
             )}
 
-            {!selectedNumber &&
-              !bulkCreateMutation.isLoading &&
-              bulkUploadErrors.length > 0 && (
-                <Grid size={{ xs: 12 }}>
-                  <BulkUploadErrorDetails
-                    errors={bulkUploadErrors}
-                    onRetry={() => setBulkUploadErrors([])}
-                    onClear={() => {
-                      setBulkUploadErrors([]);
-                      setFormData((prev) => ({ ...prev, numbers: "" }));
-                    }}
-                  />
-                </Grid>
-              )}
+            {!selectedNumber && !bulkCreateMutation.isLoading && bulkUploadErrors.length > 0 && (
+              <Grid size={{ xs: 12 }}>
+                <BulkUploadErrorDetails
+                  errors={bulkUploadErrors}
+                  onRetry={() => setBulkUploadErrors([])}
+                  onClear={() => {
+                    setBulkUploadErrors([]);
+                    setFormData((prev) => ({ ...prev, numbers: "" }));
+                  }}
+                />
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions
@@ -2933,10 +2871,7 @@ export const IndianNumbers = () => {
           }}
         >
           <OutlineButton
-            onClick={() => {
-              setOpenDialog(false);
-              resetForm();
-            }}
+            onClick={() => { setOpenDialog(false); resetForm(); }}
             size="medium"
             sx={{ fontSize: "0.82rem", px: 2 }}
             disabled={isMutating}
@@ -2947,7 +2882,9 @@ export const IndianNumbers = () => {
             onClick={handleSubmit}
             variant="contained"
             disabled={
-              !formData.operator || !formData.circle || !formData.country_code ||
+              !formData.operator ||
+              !formData.circle ||
+              !formData.country_code ||
               !formData.numbers.trim() ||
               isMutating ||
               validationWarnings.length > 0 ||
@@ -2976,6 +2913,7 @@ export const IndianNumbers = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Bulk Edit Dialog */}
       <Dialog
         open={bulkEditDialog.open}
         onClose={() => setBulkEditDialog((prev) => ({ ...prev, open: false }))}
@@ -3010,10 +2948,7 @@ export const IndianNumbers = () => {
                 type="text"
                 value={bulkEditDialog.limit}
                 onChange={(e) =>
-                  setBulkEditDialog((prev) => ({
-                    ...prev,
-                    limit: e.target.value,
-                  }))
+                  setBulkEditDialog((prev) => ({ ...prev, limit: e.target.value }))
                 }
                 size="small"
               />
@@ -3024,14 +2959,12 @@ export const IndianNumbers = () => {
                 label="RDP ID"
                 value={bulkEditDialog.rdp_id}
                 onChange={(e) =>
-                  setBulkEditDialog((prev) => ({
-                    ...prev,
-                    rdp_id: e.target.value,
-                  }))
+                  setBulkEditDialog((prev) => ({ ...prev, rdp_id: e.target.value }))
                 }
                 size="small"
               />
             </Grid>
+            {/* Password Formatters - Bulk Edit */}
             <Grid size={{ xs: 12 }}>
               <FormControl fullWidth size="small">
                 <InputLabel sx={{ fontSize: "0.85rem" }}>
@@ -3068,60 +3001,70 @@ export const IndianNumbers = () => {
                   )}
                   MenuProps={MenuProps}
                 >
-                  {sortedFormatterCountryCodes.map((cc) => {
-                    const countryIds = formatterGroupsData[cc].map((f) => String(f._id));
-                    const isAllSelected = countryIds.every((id) =>
-                      bulkEditDialog.password_formatter_ids.includes(id),
-                    );
-                    const isSomeSelected =
-                      countryIds.some((id) =>
-                        bulkEditDialog.password_formatter_ids.includes(id),
-                      ) && !isAllSelected;
+                  {formattersLoading ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={18} sx={{ mr: 1 }} /> Loading…
+                    </MenuItem>
+                  ) : (
+                    <>
+                      {sortedFormatterCountryCodes.map((cc) => {
+                        const countryIds = formatterGroupsData[cc].map((f) => String(f._id));
+                        const isAllSelected = countryIds.every((id) =>
+                          bulkEditDialog.password_formatter_ids.includes(id)
+                        );
+                        const isSomeSelected =
+                          countryIds.some((id) =>
+                            bulkEditDialog.password_formatter_ids.includes(id)
+                          ) && !isAllSelected;
 
-                    return (
-                      <MenuItem
-                        key={`group-${cc}`}
-                        value={`select-country-${cc}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const newIds = isAllSelected
-                            ? bulkEditDialog.password_formatter_ids.filter(
-                                (id) => !countryIds.includes(id),
-                              )
-                            : [...new Set([...bulkEditDialog.password_formatter_ids, ...countryIds])];
-                          setBulkEditDialog((prev) => ({
-                            ...prev,
-                            password_formatter_ids: newIds,
-                          }));
-                        }}
-                        sx={{
-                          fontSize: "0.83rem",
-                          fontWeight: 700,
-                          backgroundColor: alpha(GREEN, 0.05),
-                          "&:hover": { backgroundColor: alpha(GREEN, 0.1) },
-                        }}
-                      >
-                        <Checkbox
-                          size="small"
-                          checked={isAllSelected}
-                          indeterminate={isSomeSelected}
-                          sx={{
-                            color: GREEN,
-                            "&.Mui-checked": { color: GREEN },
-                          }}
-                        />
-                        <ListItemText
-                          primary={`Select All for ${cc}`}
-                          primaryTypographyProps={{
-                            fontSize: "0.83rem",
-                            fontWeight: 700,
-                            color: GREEN,
-                          }}
-                        />
-                      </MenuItem>
-                    );
-                  })}
+                        return (
+                          <MenuItem
+                            key={`group-${cc}`}
+                            value={`select-country-${cc}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const newIds = isAllSelected
+                                ? bulkEditDialog.password_formatter_ids.filter(
+                                    (id) => !countryIds.includes(id)
+                                  )
+                                : [
+                                    ...new Set([
+                                      ...bulkEditDialog.password_formatter_ids,
+                                      ...countryIds,
+                                    ]),
+                                  ];
+                              setBulkEditDialog((prev) => ({
+                                ...prev,
+                                password_formatter_ids: newIds,
+                              }));
+                            }}
+                            sx={{
+                              fontSize: "0.83rem",
+                              fontWeight: 700,
+                              backgroundColor: alpha(GREEN, 0.05),
+                              "&:hover": { backgroundColor: alpha(GREEN, 0.1) },
+                            }}
+                          >
+                            <Checkbox
+                              size="small"
+                              checked={isAllSelected}
+                              indeterminate={isSomeSelected}
+                              sx={{ color: GREEN, "&.Mui-checked": { color: GREEN } }}
+                            />
+                            <ListItemText
+                              primary={`Select All - ${cc}`}
+                              primaryTypographyProps={{
+                                fontSize: "0.83rem",
+                                fontWeight: 700,
+                                color: GREEN,
+                              }}
+                            />
+                          </MenuItem>
+                        );
+                      })}
+                    </>
+                  )}
                 </Select>
               </FormControl>
             </Grid>
@@ -3136,9 +3079,7 @@ export const IndianNumbers = () => {
           }}
         >
           <OutlineButton
-            onClick={() =>
-              setBulkEditDialog((prev) => ({ ...prev, open: false }))
-            }
+            onClick={() => setBulkEditDialog((prev) => ({ ...prev, open: false }))}
             size="medium"
             sx={{ fontSize: "0.82rem", px: 2 }}
           >
@@ -3176,10 +3117,7 @@ export const IndianNumbers = () => {
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
         <Alert severity="success" elevation={4} sx={snackbarBaseSx(GREEN)}>
-          <Typography
-            fontWeight={500}
-            sx={{ fontSize: "0.82rem", color: TEXT }}
-          >
+          <Typography fontWeight={500} sx={{ fontSize: "0.82rem", color: TEXT }}>
             {success}
           </Typography>
         </Alert>
@@ -3191,10 +3129,7 @@ export const IndianNumbers = () => {
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
         <Alert severity="error" elevation={4} sx={snackbarBaseSx(RED)}>
-          <Typography
-            fontWeight={500}
-            sx={{ fontSize: "0.82rem", color: TEXT }}
-          >
+          <Typography fontWeight={500} sx={{ fontSize: "0.82rem", color: TEXT }}>
             {error}
           </Typography>
         </Alert>
