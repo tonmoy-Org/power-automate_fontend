@@ -23,6 +23,13 @@ import {
   DialogActions,
   Button,
   TextField,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from "@mui/material";
 import {
   Delete as DeleteIcon,
@@ -370,6 +377,30 @@ const CountryCredentialCard = memo(({
                       </Tooltip>
                     </Box>
                   </Box>
+                  
+                  {countryCode === "91" && typeCredentials.some(c => c.operator || c.circle) && (
+                    <Box px={1.5} py={0.5} pb={1} sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                      {Object.entries(
+                         typeCredentials.reduce((acc, c) => {
+                            if (!c.operator && !c.circle) return acc;
+                            const op = c.operator || 'Unknown';
+                            const circ = c.circle || 'Unknown';
+                            const key = `${op}-${circ}`;
+                            if (!acc[key]) acc[key] = { operator: op, circle: circ, count: 0 };
+                            acc[key].count++;
+                            return acc;
+                         }, {})
+                      ).map(([key, data]) => (
+                         <Chip 
+                            key={key} 
+                            label={`${data.operator} | ${data.circle} (${data.count})`}
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.65rem', height: 20, borderColor: alpha(typeColor, 0.4), color: typeColor, fontWeight: 600 }}
+                         />
+                      ))}
+                    </Box>
+                  )}
 
                   {index < arr.length - 1 && (
                     <Divider sx={{ opacity: 0.25, my: 0.25 }} />
@@ -517,6 +548,28 @@ export default function ValidPhoneNumber() {
       })),
     [credentials, uniqueTypes],
   );
+
+  const operatorSummary = useMemo(() => {
+    const counts = credentials.reduce((acc, c) => {
+      if (c.country_code !== "91" || !c.operator) return acc;
+      const key = c.operator;
+      if (!acc[key]) acc[key] = { label: key, count: 0 };
+      acc[key].count++;
+      return acc;
+    }, {});
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [credentials]);
+
+  const circleSummary = useMemo(() => {
+    const counts = credentials.reduce((acc, c) => {
+      if (c.country_code !== "91" || !c.circle) return acc;
+      const key = c.circle;
+      if (!acc[key]) acc[key] = { label: key, count: 0 };
+      acc[key].count++;
+      return acc;
+    }, {});
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [credentials]);
 
   const filteredCredentials = useMemo(() => {
     if (!debouncedSearch.trim()) return credentials;
@@ -892,6 +945,69 @@ export default function ValidPhoneNumber() {
               );
             })}
           </Grid>
+
+          {[
+            { data: operatorSummary, prefix: "Op: " },
+            { data: circleSummary, prefix: "Cir: " }
+          ].map((summaryGroup, idx) => summaryGroup.data.length > 0 && (
+            <Grid container spacing={1.5} sx={{ mb: 2 }} key={idx}>
+              {summaryGroup.data.map(({ label, count }) => {
+                const color = getTypeColor(count > 0);
+                const bg = getTypeBackground(count > 0);
+                const border = getTypeBorder(count > 0);
+
+                return (
+                  <Grid item xs="auto" key={label}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        minWidth: 130,
+                        border: `1px solid ${border}`,
+                        borderRadius: 2,
+                        background: bg,
+                        transition: "box-shadow 0.2s",
+                        "&:hover": {
+                          boxShadow: `0 2px 10px ${alpha(color, 0.25)}`,
+                        },
+                      }}
+                    >
+                      <CardContent
+                        sx={{ py: 1.25, px: 2, "&:last-child": { pb: 1.25 } }}
+                      >
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          gap={1.5}
+                        >
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Chip
+                              label={`${summaryGroup.prefix}${label}`}
+                              size="small"
+                              sx={{
+                                fontSize: "0.7rem",
+                                height: 22,
+                                backgroundColor: alpha(color, 0.15),
+                                color,
+                                border: `1px solid ${border}`,
+                                fontWeight: 700,
+                              }}
+                            />
+                            <Typography
+                              fontWeight={700}
+                              sx={{ fontSize: "1rem", color, lineHeight: 1 }}
+                            >
+                              {count}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          ))}
 
           <Box sx={{ mb: 3 }}>
             <Card
