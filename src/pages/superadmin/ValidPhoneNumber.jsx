@@ -157,48 +157,114 @@ export default function ValidPhoneNumber() {
 
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteCredentials,
+    onMutate: async (target) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
+      const previousData = queryClient.getQueryData(["phoneCredentials"]);
+      if (previousData) {
+        queryClient.setQueryData(["phoneCredentials"], (old) => {
+          if (!old) return [];
+          const idsToDelete = Array.isArray(target)
+            ? target
+            : target.ids
+            ? target.ids
+            : typeof target === "string"
+            ? [target]
+            : target._id
+            ? [target._id]
+            : [];
+          if (idsToDelete.length > 0) {
+            return old.filter((item) => !idsToDelete.includes(item._id));
+          }
+          return old.filter((item) => item.country_code !== target.countryCode);
+        });
+      }
+      return { previousData };
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneCredentials"]);
       setSuccess(
         data.message ||
-        `All credentials for ${deleteTarget?.countryCode} deleted successfully`,
+        `Credentials deleted successfully`,
       );
       setDeleteTarget(null);
     },
-    onError: (err) => {
+    onError: (err, target, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(["phoneCredentials"], context.previousData);
+      }
       setError(err.response?.data?.message || "Failed to delete credentials");
       setDeleteTarget(null);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries(["phoneCredentials"]);
     },
   });
 
   const deleteTypeMutation = useMutation({
     mutationFn: deleteByTypeAndCountry,
+    onMutate: async (target) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
+      const previousData = queryClient.getQueryData(["phoneCredentials"]);
+      if (previousData) {
+        queryClient.setQueryData(["phoneCredentials"], (old) => {
+          if (!old) return [];
+          if (target.ids) {
+            return old.filter((item) => !target.ids.includes(item._id));
+          }
+          return old.filter(
+            (item) => !(item.country_code === target.countryCode && item.type === target.type)
+          );
+        });
+      }
+      return { previousData };
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries(["phoneCredentials"]);
       setSuccess(
         data.message ||
-        `Type ${deleteTypeTarget?.type} credentials for ${deleteTypeTarget?.countryCode} deleted successfully`,
+        `Type ${deleteTypeTarget?.type} credentials deleted successfully`,
       );
       setDeleteTypeTarget(null);
     },
-    onError: (err) => {
+    onError: (err, target, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(["phoneCredentials"], context.previousData);
+      }
       setError(
         err.response?.data?.message || "Failed to delete type credentials",
       );
       setDeleteTypeTarget(null);
     },
+    onSettled: () => {
+      queryClient.invalidateQueries(["phoneCredentials"]);
+    },
   });
 
   const deleteSingleMutation = useMutation({
     mutationFn: deleteSingleCredential,
+    onMutate: async (targetId) => {
+      await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
+      const previousData = queryClient.getQueryData(["phoneCredentials"]);
+      if (previousData) {
+        queryClient.setQueryData(["phoneCredentials"], (old) => {
+          if (!old) return [];
+          const id = typeof targetId === "object" ? targetId._id || targetId.id : targetId;
+          return old.filter((item) => item._id !== id);
+        });
+      }
+      return { previousData };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries(["phoneCredentials"]);
       setSuccess("Credential deleted successfully");
       setDeleteSingleTarget(null);
     },
-    onError: (err) => {
+    onError: (err, target, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(["phoneCredentials"], context.previousData);
+      }
       setError(err.response?.data?.message || "Failed to delete credential");
       setDeleteSingleTarget(null);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries(["phoneCredentials"]);
     },
   });
 
@@ -464,6 +530,45 @@ export default function ValidPhoneNumber() {
     setDeleteSingleTarget(credential);
   };
 
+  const handleDeleteTypeSummary = (type) => {
+    const typeCredentials = credentials.filter((c) => c.type === type);
+    const ids = typeCredentials.map((c) => c._id);
+    setDeleteTarget({
+      countryCode: `Type ${type}`,
+      ids,
+      count: ids.length,
+    });
+  };
+
+  const handleDeleteOperatorSummary = (operator) => {
+    const operatorCredentials = credentials.filter((c) => c.operator === operator);
+    const ids = operatorCredentials.map((c) => c._id);
+    setDeleteTarget({
+      countryCode: `Operator ${operator}`,
+      ids,
+      count: ids.length,
+    });
+  };
+
+  const handleDeleteCircleSummary = (circle) => {
+    const circleCredentials = credentials.filter((c) => c.circle === circle);
+    const ids = circleCredentials.map((c) => c._id);
+    setDeleteTarget({
+      countryCode: `Circle ${circle}`,
+      ids,
+      count: ids.length,
+    });
+  };
+
+  const handleDeleteAllSummary = () => {
+    const ids = credentials.map((c) => c._id);
+    setDeleteTarget({
+      countryCode: "All Profiles",
+      ids,
+      count: ids.length,
+    });
+  };
+
   const handleDeleteConfirm = () => {
     if (deleteTarget) deleteMutation.mutate(deleteTarget.ids);
   };
@@ -619,24 +724,44 @@ export default function ValidPhoneNumber() {
                           </Typography>
                         </Box>
 
-                        <Tooltip title={`Download all Type ${type}`}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDownloadTypeAll(type)}
-                              disabled={count === 0}
-                              sx={{
-                                color: count > 0 ? color : GREY_COLOR,
-                                p: 0.5,
-                                "&:hover": {
-                                  backgroundColor: alpha(color, 0.15),
-                                },
-                              }}
-                            >
-                              <DownloadAllIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Tooltip title={`Download all Type ${type}`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDownloadTypeAll(type)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? color : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(color, 0.15),
+                                  },
+                                }}
+                              >
+                                <DownloadAllIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={`Delete all Type ${type} credentials`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteTypeSummary(type)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? RED_COLOR : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(RED_COLOR, 0.15),
+                                  },
+                                }}
+                              >
+                                <DeleteIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -697,24 +822,44 @@ export default function ValidPhoneNumber() {
                             </Typography>
                           </Box>
 
-                          <Tooltip title={`Download all Operator ${label}`}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDownloadOperatorAll(label)}
-                                disabled={count === 0}
-                                sx={{
-                                  color: count > 0 ? color : GREY_COLOR,
-                                  p: 0.5,
-                                  "&:hover": {
-                                    backgroundColor: alpha(color, 0.15),
-                                  },
-                                }}
-                              >
-                                <DownloadAllIcon sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Tooltip title={`Download all Operator ${label}`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDownloadOperatorAll(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? color : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(color, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DownloadAllIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={`Delete all Operator ${label} credentials`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteOperatorSummary(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? RED_COLOR : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(RED_COLOR, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DeleteIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -776,24 +921,44 @@ export default function ValidPhoneNumber() {
                             </Typography>
                           </Box>
 
-                          <Tooltip title={`Download all Circle ${label}`}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDownloadCircleAll(label)}
-                                disabled={count === 0}
-                                sx={{
-                                  color: count > 0 ? color : GREY_COLOR,
-                                  p: 0.5,
-                                  "&:hover": {
-                                    backgroundColor: alpha(color, 0.15),
-                                  },
-                                }}
-                              >
-                                <DownloadAllIcon sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Tooltip title={`Download all Circle ${label}`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDownloadCircleAll(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? color : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(color, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DownloadAllIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={`Delete all Circle ${label} credentials`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteCircleSummary(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? RED_COLOR : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(RED_COLOR, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DeleteIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -873,6 +1038,22 @@ export default function ValidPhoneNumber() {
                       }}
                     >
                       <DownloadAllIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete all credentials">
+                    <IconButton
+                      size="small"
+                      onClick={handleDeleteAllSummary}
+                      disabled={credentials.length === 0}
+                      sx={{
+                        color: RED_COLOR,
+                        backgroundColor: alpha(RED_COLOR, 0.1),
+                        "&:hover": {
+                          backgroundColor: alpha(RED_COLOR, 0.2),
+                        },
+                      }}
+                    >
+                      <DeleteIcon sx={{ fontSize: 20 }} />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -1229,7 +1410,7 @@ export default function ValidPhoneNumber() {
               {deleteTarget?.count} credential
               {deleteTarget?.count !== 1 ? "s" : ""}
             </strong>{" "}
-            for <strong>Country Code {deleteTarget?.countryCode}</strong>? This
+            for <strong>{deleteTarget?.countryCode?.startsWith("Type") || deleteTarget?.countryCode?.startsWith("Operator") || deleteTarget?.countryCode?.startsWith("Circle") || deleteTarget?.countryCode === "All Profiles" ? deleteTarget.countryCode : `Country Code ${deleteTarget?.countryCode}`}</strong>? This
             action cannot be undone.
           </DialogContentText>
         </DialogContent>

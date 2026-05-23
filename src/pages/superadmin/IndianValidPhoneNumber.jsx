@@ -463,6 +463,19 @@ export default function IndianValidPhoneNumber() {
       const previousData = queryClient.getQueryData(["indianPhoneCredentials"]);
       if (previousData) {
         queryClient.setQueryData(["indianPhoneCredentials"], (old) => {
+          if (!old) return [];
+          const idsToDelete = Array.isArray(target)
+            ? target
+            : target.ids
+            ? target.ids
+            : typeof target === "string"
+            ? [target]
+            : target._id
+            ? [target._id]
+            : [];
+          if (idsToDelete.length > 0) {
+            return old.filter((item) => !idsToDelete.includes(item._id));
+          }
           if (target.isType) {
             return old.filter((item) => !(item.circle === target.circleName && item.type === target.type));
           }
@@ -492,9 +505,15 @@ export default function IndianValidPhoneNumber() {
       await queryClient.cancelQueries({ queryKey: ["indianPhoneCredentials"] });
       const previousData = queryClient.getQueryData(["indianPhoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["indianPhoneCredentials"], (old) =>
-          old.filter((item) => !(item.country_code === target.countryCode && item.type === target.type))
-        );
+        queryClient.setQueryData(["indianPhoneCredentials"], (old) => {
+          if (!old) return [];
+          if (target.ids) {
+            return old.filter((item) => !target.ids.includes(item._id));
+          }
+          return old.filter(
+            (item) => item.type !== target.type
+          );
+        });
       }
       return { previousData };
     },
@@ -515,13 +534,15 @@ export default function IndianValidPhoneNumber() {
 
   const deleteSingleMutation = useMutation({
     mutationFn: deleteSingleCredential,
-    onMutate: async (target) => {
+    onMutate: async (targetId) => {
       await queryClient.cancelQueries({ queryKey: ["indianPhoneCredentials"] });
       const previousData = queryClient.getQueryData(["indianPhoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["indianPhoneCredentials"], (old) =>
-          old.filter((item) => item._id !== target._id)
-        );
+        queryClient.setQueryData(["indianPhoneCredentials"], (old) => {
+          if (!old) return [];
+          const id = typeof targetId === "object" ? targetId._id || targetId.id : targetId;
+          return old.filter((item) => item._id !== id);
+        });
       }
       return { previousData };
     },
@@ -827,6 +848,45 @@ export default function IndianValidPhoneNumber() {
     setDeleteSingleTarget(credential);
   }, []);
 
+  const handleDeleteTypeSummary = useCallback((type) => {
+    const typeCredentials = credentials.filter((c) => c.type === type);
+    const ids = typeCredentials.map((c) => c._id);
+    setDeleteTarget({
+      label: `Type ${type}`,
+      ids,
+      count: ids.length,
+    });
+  }, [credentials]);
+
+  const handleDeleteOperatorSummary = useCallback((operator) => {
+    const operatorCredentials = credentials.filter((c) => c.operator === operator);
+    const ids = operatorCredentials.map((c) => c._id);
+    setDeleteTarget({
+      label: `Operator ${operator}`,
+      ids,
+      count: ids.length,
+    });
+  }, [credentials]);
+
+  const handleDeleteCircleSummary = useCallback((circle) => {
+    const circleCredentials = credentials.filter((c) => c.circle === circle);
+    const ids = circleCredentials.map((c) => c._id);
+    setDeleteTarget({
+      label: `Circle ${circle}`,
+      ids,
+      count: ids.length,
+    });
+  }, [credentials]);
+
+  const handleDeleteAllSummary = useCallback(() => {
+    const ids = credentials.map((c) => c._id);
+    setDeleteTarget({
+      label: "All Profiles",
+      ids,
+      count: ids.length,
+    });
+  }, [credentials]);
+
   const handleDeleteConfirm = () => {
     if (deleteTarget) deleteMutation.mutate(deleteTarget);
   };
@@ -984,24 +1044,44 @@ export default function IndianValidPhoneNumber() {
                           </Typography>
                         </Box>
 
-                        <Tooltip title={`Download all Type ${type}`}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDownloadTypeAll(type)}
-                              disabled={count === 0}
-                              sx={{
-                                color: count > 0 ? color : GREY_COLOR,
-                                p: 0.5,
-                                "&:hover": {
-                                  backgroundColor: alpha(color, 0.15),
-                                },
-                              }}
-                            >
-                              <DownloadAllIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                        <Box display="flex" alignItems="center" gap={0.5}>
+                          <Tooltip title={`Download all Type ${type}`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDownloadTypeAll(type)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? color : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(color, 0.15),
+                                  },
+                                }}
+                              >
+                                <DownloadAllIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={`Delete all Type ${type} credentials`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteTypeSummary(type)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? RED_COLOR : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(RED_COLOR, 0.15),
+                                  },
+                                }}
+                              >
+                                <DeleteIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -1062,24 +1142,44 @@ export default function IndianValidPhoneNumber() {
                             </Typography>
                           </Box>
 
-                          <Tooltip title={`Download all Operator ${label}`}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDownloadOperatorAll(label)}
-                                disabled={count === 0}
-                                sx={{
-                                  color: count > 0 ? color : GREY_COLOR,
-                                  p: 0.5,
-                                  "&:hover": {
-                                    backgroundColor: alpha(color, 0.15),
-                                  },
-                                }}
-                              >
-                                <DownloadAllIcon sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Tooltip title={`Download all Operator ${label}`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDownloadOperatorAll(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? color : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(color, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DownloadAllIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={`Delete all Operator ${label} credentials`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteOperatorSummary(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? RED_COLOR : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(RED_COLOR, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DeleteIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -1141,24 +1241,44 @@ export default function IndianValidPhoneNumber() {
                             </Typography>
                           </Box>
 
-                          <Tooltip title={`Download all Circle ${label}`}>
-                            <span>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleDownloadCircleAll(label)}
-                                disabled={count === 0}
-                                sx={{
-                                  color: count > 0 ? color : GREY_COLOR,
-                                  p: 0.5,
-                                  "&:hover": {
-                                    backgroundColor: alpha(color, 0.15),
-                                  },
-                                }}
-                              >
-                                <DownloadAllIcon sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Tooltip title={`Download all Circle ${label}`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDownloadCircleAll(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? color : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(color, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DownloadAllIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={`Delete all Circle ${label} credentials`}>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDeleteCircleSummary(label)}
+                                  disabled={count === 0}
+                                  sx={{
+                                    color: count > 0 ? RED_COLOR : GREY_COLOR,
+                                    p: 0.5,
+                                    "&:hover": {
+                                      backgroundColor: alpha(RED_COLOR, 0.15),
+                                    },
+                                  }}
+                                >
+                                  <DeleteIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          </Box>
                         </Box>
                       </CardContent>
                     </Card>
@@ -1237,6 +1357,22 @@ export default function IndianValidPhoneNumber() {
                       }}
                     >
                       <DownloadAllIcon sx={{ fontSize: 20 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete all credentials">
+                    <IconButton
+                      size="small"
+                      onClick={handleDeleteAllSummary}
+                      disabled={credentials.length === 0}
+                      sx={{
+                        color: RED_COLOR,
+                        backgroundColor: alpha(RED_COLOR, 0.1),
+                        "&:hover": {
+                          backgroundColor: alpha(RED_COLOR, 0.2),
+                        },
+                      }}
+                    >
+                      <DeleteIcon sx={{ fontSize: 20 }} />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -1337,7 +1473,7 @@ export default function IndianValidPhoneNumber() {
               {deleteTarget?.count} credential
               {deleteTarget?.count !== 1 ? "s" : ""}
             </strong>{" "}
-            for <strong>Country Code {deleteTarget?.countryCode}</strong>? This
+            for <strong>{deleteTarget?.circleName ? `Circle ${deleteTarget.circleName}` : (deleteTarget?.label || "Selected Group")}</strong>? This
             action cannot be undone.
           </DialogContentText>
         </DialogContent>
