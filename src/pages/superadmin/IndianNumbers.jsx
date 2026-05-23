@@ -487,6 +487,7 @@ const CountryCodeRow = memo(({
   globalStartIndex,
   absoluteGroupIdx,
   onBulkEdit,
+  statusFilter,
 }) => {
   const [open, setOpen] = useState(false);
   const [innerPage, setInnerPage] = useState(0);
@@ -533,23 +534,41 @@ const CountryCodeRow = memo(({
   }, [group.items, innerNumbers]);
 
   const totalGroupCount = useMemo(() => {
+    if (statusFilter && statusFilter !== "all") {
+      if (items.length > 0 && items[0]?.count === undefined) {
+        return items.filter((item) => item.is_active === statusFilter).length;
+      }
+      if (statusFilter === "inactive") return group.inactiveCount || 0;
+      if (statusFilter === "running") return group.runningCount || 0;
+      if (statusFilter === "completed") return group.completedCount || 0;
+    }
     if (group.items.length > 0 && group.items[0]?.count !== undefined) {
       return group.items[0].count;
     }
     return group.items.length;
-  }, [group.items]);
+  }, [group.items, items, statusFilter, group]);
 
   const groupIds = useMemo(() => {
+    if (items.length > 0 && items[0]?.count === undefined) {
+      const list = statusFilter && statusFilter !== "all"
+        ? items.filter((i) => i.is_active === statusFilter)
+        : items;
+      return list.map((i) => i._id);
+    }
     if (group.items.length > 0 && group.items[0]?.ids !== undefined) {
       return group.items[0].ids;
     }
     return items.map((i) => i._id);
-  }, [group.items, items]);
+  }, [group.items, items, statusFilter]);
 
   const filteredItems = useMemo(() => {
-    if (!debouncedInnerSearch) return items;
+    let result = items;
+    if (statusFilter && statusFilter !== "all") {
+      result = items.filter((item) => item.is_active === statusFilter);
+    }
+    if (!debouncedInnerSearch) return result;
     const searchLower = debouncedInnerSearch.toLowerCase();
-    return items.filter((item) => {
+    return result.filter((item) => {
       const numberMatch = item.number && item.number.toLowerCase().includes(searchLower);
       const rdpMatch = item.rdp_id && item.rdp_id.toLowerCase() === searchLower;
       return numberMatch || rdpMatch;
@@ -1709,11 +1728,22 @@ export const IndianNumbers = () => {
   const allIndianNumbers = useMemo(() => indianNumbersData?.data || [], [indianNumbersData]);
   const passwordFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
 
-  const filteredNumbers = useMemo(() =>
-    statusFilter === "all"
-      ? allIndianNumbers
-      : allIndianNumbers.filter((item) => item.is_active === statusFilter)
-  , [allIndianNumbers, statusFilter]);
+  const filteredNumbers = useMemo(() => {
+    if (statusFilter === "all") return allIndianNumbers;
+    
+    // Summary mode (where array elements are pre-aggregated operator/circle groups)
+    if (allIndianNumbers.length > 0 && allIndianNumbers[0]?.count !== undefined) {
+      return allIndianNumbers.filter((group) => {
+        if (statusFilter === "inactive") return (group.inactiveCount || 0) > 0;
+        if (statusFilter === "running") return (group.runningCount || 0) > 0;
+        if (statusFilter === "completed") return (group.completedCount || 0) > 0;
+        return false;
+      });
+    }
+    
+    // Detailed / search mode (where array elements are individual phone numbers)
+    return allIndianNumbers.filter((item) => item.is_active === statusFilter);
+  }, [allIndianNumbers, statusFilter]);
 
   const groupedNumbers = useMemo(() => groupByOperatorAndCircle(filteredNumbers), [filteredNumbers]);
 
@@ -2481,6 +2511,7 @@ export const IndianNumbers = () => {
                     globalStartIndex={groupStartIndex}
                     absoluteGroupIdx={absoluteGroupIdx}
                     onBulkEdit={handleBulkEditClick}
+                    statusFilter={statusFilter}
                   />
                 );
               })
