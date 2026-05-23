@@ -613,11 +613,11 @@ const CountryCodeRow = memo(({
   const hasGlobalChild = useMemo(() => globalSelectedInGroup.length > 0, [globalSelectedInGroup]);
 
   const statusCounts = useMemo(() => {
-    if (filteredItems.length > 0) {
+    if (items.length > 0 && items[0]?.count === undefined) {
       return {
-        inactive: filteredItems.filter((i) => i.is_active === "inactive").length,
-        running: filteredItems.filter((i) => i.is_active === "running").length,
-        completed: filteredItems.filter((i) => i.is_active === "completed").length,
+        inactive: items.filter((i) => i.is_active === "inactive").length,
+        running: items.filter((i) => i.is_active === "running").length,
+        completed: items.filter((i) => i.is_active === "completed").length,
       };
     }
     return {
@@ -625,7 +625,7 @@ const CountryCodeRow = memo(({
       running: group.runningCount || 0,
       completed: group.completedCount || 0,
     };
-  }, [filteredItems, group]);
+  }, [items, group]);
 
   const handleRowClick = (e) => {
     if (
