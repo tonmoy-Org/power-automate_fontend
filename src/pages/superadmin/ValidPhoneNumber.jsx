@@ -39,9 +39,10 @@ const CARDS_PER_PAGE = 9;
 
 const fetchPhoneCredentials = async () => {
   const response = await axiosInstance.get("/phone-credentials", {
-    params: { summary: "true" },
+    headers: { "Cache-Control": "no-cache" },
   });
-  return response.data;
+  const raw = response.data;
+  return Array.isArray(raw) ? raw : (raw?.data ?? []);
 };
 
 const bulkDeleteCredentials = async (ids) => {
@@ -144,7 +145,7 @@ export default function ValidPhoneNumber() {
   const [deleteSingleTarget, setDeleteSingleTarget] = useState(null);
 
   const {
-    data: credentialsResponse = { summary: false, data: [] },
+    data: credentials = [],
     isLoading,
     error: queryError,
   } = useQuery({
@@ -153,15 +154,6 @@ export default function ValidPhoneNumber() {
     staleTime: 30000,
     cacheTime: 300000,
   });
-
-  const credentials = useMemo(() => {
-    if (credentialsResponse?.summary) return credentialsResponse.data;
-    return Array.isArray(credentialsResponse) ? credentialsResponse : (credentialsResponse?.data ?? []);
-  }, [credentialsResponse]);
-
-  const totalCredentialsCount = useMemo(() => {
-    return credentials.reduce((sum, c) => sum + (c.count ?? 1), 0);
-  }, [credentials]);
 
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteCredentials,
@@ -217,11 +209,10 @@ export default function ValidPhoneNumber() {
 
   const typeSummary = useMemo(
     () =>
-      uniqueTypes.map((type) => {
-        const matching = credentials.filter((c) => c.type === type);
-        const count = matching.reduce((sum, c) => sum + (c.count ?? 1), 0);
-        return { type, count };
-      }),
+      uniqueTypes.map((type) => ({
+        type,
+        count: credentials.filter((c) => c.type === type).length,
+      })),
     [credentials, uniqueTypes],
   );
 
@@ -231,8 +222,9 @@ export default function ValidPhoneNumber() {
     return credentials.filter(
       (cred) =>
         cred.country_code?.toLowerCase().includes(query) ||
-        cred.type?.toLowerCase().includes(query) ||
         cred.phone?.toLowerCase().includes(query) ||
+        cred.type?.toLowerCase().includes(query) ||
+        (cred.url && cred.url.toLowerCase().includes(query)) ||
         (cred.password && cred.password.toLowerCase().includes(query)),
     );
   }, [credentials, searchQuery]);
@@ -308,19 +300,14 @@ export default function ValidPhoneNumber() {
     }
   };
 
-  const handleDownload = async (countryCredentials, type) => {
+  const handleDownload = (countryCredentials, type) => {
     try {
-      const countryCode = countryCredentials[0]?.country_code || "unknown";
-      setSuccess(`Fetching Type ${type} credentials for download...`);
-      const response = await axiosInstance.get("/phone-credentials", {
-        params: { country_code: countryCode }
-      });
-      const fullCredentials = response.data;
-      const content = generateTypeContent(fullCredentials, type);
+      const content = generateTypeContent(countryCredentials, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
       }
+      const countryCode = countryCredentials[0]?.country_code || "unknown";
       downloadTxtFile(content, `${countryCode}_type_${type}.txt`);
       setSuccess(
         `Downloaded Type ${type} credentials for Country Code: ${countryCode}`,
@@ -330,15 +317,10 @@ export default function ValidPhoneNumber() {
     }
   };
 
-  const handleDownloadAll = async (countryCredentials) => {
+  const handleDownloadAll = (countryCredentials) => {
     try {
       const countryCode = countryCredentials[0]?.country_code || "unknown";
-      setSuccess(`Fetching credentials for country code ${countryCode}...`);
-      const response = await axiosInstance.get("/phone-credentials", {
-        params: { country_code: countryCode }
-      });
-      const fullCredentials = response.data;
-      const content = generateAllContent(fullCredentials, uniqueTypes);
+      const content = generateAllContent(countryCredentials, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -350,12 +332,9 @@ export default function ValidPhoneNumber() {
     }
   };
 
-  const handleDownloadTypeAll = async (type) => {
+  const handleDownloadTypeAll = (type) => {
     try {
-      setSuccess(`Fetching all Type ${type} credentials for download...`);
-      const response = await axiosInstance.get("/phone-credentials");
-      const fullCredentials = response.data;
-      const content = generateTypeContent(fullCredentials, type);
+      const content = generateTypeContent(credentials, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
@@ -367,12 +346,9 @@ export default function ValidPhoneNumber() {
     }
   };
 
-  const handleDownloadAllCredentials = async () => {
+  const handleDownloadAllCredentials = () => {
     try {
-      setSuccess("Fetching all credentials for download (this may take a few seconds)...");
-      const response = await axiosInstance.get("/phone-credentials");
-      const fullCredentials = response.data;
-      const content = generateAllContent(fullCredentials, uniqueTypes);
+      const content = generateAllContent(credentials, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -381,7 +357,7 @@ export default function ValidPhoneNumber() {
         content,
         `all_credentials_${new Date().toISOString().split("T")[0]}.txt`,
       );
-      setSuccess(`Downloaded all credentials (${fullCredentials.length} total)`);
+      setSuccess(`Downloaded all credentials (${credentials.length} total)`);
     } catch {
       setError("Failed to download file");
     }
@@ -451,7 +427,18 @@ export default function ValidPhoneNumber() {
     }
   };
 
-
+  if (isLoading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (queryError) {
     return (
@@ -653,7 +640,7 @@ export default function ValidPhoneNumber() {
                       variant="caption"
                       sx={{ fontWeight: 700, color: WARNING_COLOR }}
                     >
-                      {totalCredentialsCount}
+                      {credentials.length}
                     </Typography>
                   </Box>
                 </Box>
@@ -680,7 +667,7 @@ export default function ValidPhoneNumber() {
         </>
       )}
 
-      {!hasData && !isLoading ? (
+      {!hasData ? (
         <Alert severity="info" sx={{ fontSize: "0.85rem", mb: 3 }}>
           {searchQuery
             ? "No credentials found matching your search."
@@ -785,7 +772,7 @@ export default function ValidPhoneNumber() {
                           const typeColor = getTypeColor(true);
                           const typeBg = getTypeBackground(true);
                           const typeBorder = getTypeBorder(true);
-                          const typeCount = typeCredentials.reduce((sum, c) => sum + (c.count ?? 1), 0);
+                          const typeCount = typeCredentials.length;
                           const isDeletingType =
                             deleteTypeMutation.isLoading &&
                             deleteTypeTarget?.countryCode === countryCode &&

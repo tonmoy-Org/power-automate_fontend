@@ -77,9 +77,7 @@ const CARDS_PER_PAGE = 20;
 
 // API functions
 const fetchPhoneCredentials = async () => {
-  const response = await axiosInstance.get("/indian-phone-credentials", {
-    params: { summary: "true" },
-  });
+  const response = await axiosInstance.get("/indian-phone-credentials");
   return response.data;
 };
 
@@ -259,7 +257,7 @@ const CircleCredentialCard = memo(({
               const typeColor = getTypeColor(true);
               const typeBg = getTypeBackground(true);
               const typeBorder = getTypeBorder(true);
-              const typeCount = typeCredentials.reduce((sum, c) => sum + (c.count ?? 1), 0);
+              const typeCount = typeCredentials.length;
               const isDeletingType =
                 deleteTypeTarget?.circleName === circleName &&
                 deleteTypeTarget?.type === type;
@@ -389,7 +387,7 @@ const CircleCredentialCard = memo(({
                           const op = c.operator || 'Unknown';
                           const key = `${op}`;
                           if (!acc[key]) acc[key] = { operator: op, count: 0 };
-                          acc[key].count += (c.count ?? 1);
+                          acc[key].count++;
                           return acc;
                         }, {})
                       ).map(([key, data]) => (
@@ -456,16 +454,7 @@ export default function IndianValidPhoneNumber() {
     cacheTime: 300000, // Keep cache in memory for 5 minutes
   });
 
-  const credentialsResponse = rawCredentials;
-
-  const credentials = useMemo(() => {
-    if (credentialsResponse?.summary) return credentialsResponse.data;
-    return Array.isArray(credentialsResponse) ? credentialsResponse : (credentialsResponse?.data ?? []);
-  }, [credentialsResponse]);
-
-  const totalCredentialsCount = useMemo(() => {
-    return credentials.reduce((sum, c) => sum + (c.count ?? 1), 0);
-  }, [credentials]);
+  const credentials = rawCredentials;
 
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteCredentials,
@@ -558,20 +547,19 @@ export default function IndianValidPhoneNumber() {
 
   const typeSummary = useMemo(
     () =>
-      uniqueTypes.map((type) => {
-        const matching = credentials.filter((c) => c.type === type);
-        const count = matching.reduce((sum, c) => sum + (c.count ?? 1), 0);
-        return { type, count };
-      }),
+      uniqueTypes.map((type) => ({
+        type,
+        count: credentials.filter((c) => c.type === type).length,
+      })),
     [credentials, uniqueTypes],
   );
 
   const operatorSummary = useMemo(() => {
     const counts = credentials.reduce((acc, c) => {
-      if (!c.operator) return acc;
+      if (c.country_code !== "91" || !c.operator) return acc;
       const key = c.operator;
       if (!acc[key]) acc[key] = { label: key, count: 0 };
-      acc[key].count += (c.count ?? 1);
+      acc[key].count++;
       return acc;
     }, {});
     return Object.values(counts).sort((a, b) => b.count - a.count);
@@ -579,10 +567,10 @@ export default function IndianValidPhoneNumber() {
 
   const circleSummary = useMemo(() => {
     const counts = credentials.reduce((acc, c) => {
-      if (!c.circle) return acc;
+      if (c.country_code !== "91" || !c.circle) return acc;
       const key = c.circle;
       if (!acc[key]) acc[key] = { label: key, count: 0 };
-      acc[key].count += (c.count ?? 1);
+      acc[key].count++;
       return acc;
     }, {});
     return Object.values(counts).sort((a, b) => b.count - a.count);
@@ -593,10 +581,10 @@ export default function IndianValidPhoneNumber() {
     const query = debouncedSearch.toLowerCase();
     return credentials.filter(
       (cred) =>
-        cred.circle?.toLowerCase().includes(query) ||
-        cred.operator?.toLowerCase().includes(query) ||
-        cred.type?.toLowerCase().includes(query) ||
+        cred.country_code?.toLowerCase().includes(query) ||
         cred.phone?.toLowerCase().includes(query) ||
+        cred.type?.toLowerCase().includes(query) ||
+        (cred.url && cred.url.toLowerCase().includes(query)) ||
         (cred.password && cred.password.toLowerCase().includes(query)),
     );
   }, [credentials, debouncedSearch]);
@@ -672,22 +660,18 @@ export default function IndianValidPhoneNumber() {
     }
   }, []);
 
-  const handleDownload = useCallback(async (circleCredentials, type) => {
+  const handleDownload = useCallback((circleCredentials, type) => {
     try {
       if (!circleCredentials || !circleCredentials.length) {
         setError("No credentials to download");
         return;
       }
-      const circleName = circleCredentials[0]?.circle || "unknown";
-      setSuccess(`Fetching Circle ${circleName} Type ${type} credentials for download...`);
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const filtered = fullCredentials.filter((c) => c.circle === circleName);
-      const content = generateTypeContent(filtered, type);
+      const content = generateTypeContent(circleCredentials, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
       }
+      const circleName = circleCredentials[0]?.circle || "unknown";
       downloadTxtFile(content, `${circleName}_type_${type}.txt`);
       setSuccess(
         `Downloaded Type ${type} credentials for Circle: ${circleName}`,
@@ -697,18 +681,14 @@ export default function IndianValidPhoneNumber() {
     }
   }, []);
 
-  const handleDownloadAll = useCallback(async (circleCredentials) => {
+  const handleDownloadAll = useCallback((circleCredentials) => {
     try {
       if (!circleCredentials || !circleCredentials.length) {
         setError("No credentials to download");
         return;
       }
       const circleName = circleCredentials[0]?.circle || "unknown";
-      setSuccess(`Fetching all credentials for Circle ${circleName}...`);
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const filtered = fullCredentials.filter((c) => c.circle === circleName);
-      const content = generateAllContent(filtered, uniqueTypes);
+      const content = generateAllContent(circleCredentials, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -720,12 +700,9 @@ export default function IndianValidPhoneNumber() {
     }
   }, [uniqueTypes]);
 
-  const handleDownloadTypeAll = useCallback(async (type) => {
+  const handleDownloadTypeAll = useCallback((type) => {
     try {
-      setSuccess(`Fetching all Type ${type} credentials for download...`);
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const content = generateTypeContent(fullCredentials, type);
+      const content = generateTypeContent(credentials, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
@@ -735,14 +712,11 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, []);
+  }, [credentials]);
 
-  const handleDownloadOperatorAll = useCallback(async (operator) => {
+  const handleDownloadOperatorAll = useCallback((operator) => {
     try {
-      setSuccess(`Fetching all Operator ${operator} credentials...`);
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const content = fullCredentials
+      const content = credentials
         .filter((c) => c.operator === operator)
         .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
         .join("\n");
@@ -755,14 +729,11 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, []);
+  }, [credentials]);
 
-  const handleDownloadCircleAll = useCallback(async (circle) => {
+  const handleDownloadCircleAll = useCallback((circle) => {
     try {
-      setSuccess(`Fetching all Circle ${circle} credentials...`);
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const content = fullCredentials
+      const content = credentials
         .filter((c) => c.circle === circle)
         .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
         .join("\n");
@@ -775,14 +746,11 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, []);
+  }, [credentials]);
 
-  const handleDownloadAllCredentials = useCallback(async () => {
+  const handleDownloadAllCredentials = useCallback(() => {
     try {
-      setSuccess("Fetching all credentials for download (this may take a few seconds)...");
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const content = generateAllContent(fullCredentials, uniqueTypes);
+      const content = generateAllContent(credentials, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -791,18 +759,15 @@ export default function IndianValidPhoneNumber() {
         content,
         `all_credentials_${new Date().toISOString().split("T")[0]}.txt`,
       );
-      setSuccess(`Downloaded all credentials (${fullCredentials.length} total)`);
+      setSuccess(`Downloaded all credentials (${credentials.length} total)`);
     } catch {
       setError("Failed to download file");
     }
-  }, [uniqueTypes]);
+  }, [credentials, uniqueTypes]);
 
-  const handleDownloadAllSpaceSeparated = useCallback(async () => {
+  const handleDownloadAllSpaceSeparated = useCallback(() => {
     try {
-      setSuccess("Fetching all credentials for space-separated download...");
-      const response = await axiosInstance.get("/indian-phone-credentials");
-      const fullCredentials = response.data;
-      const content = generateSpaceSeparatedContent(fullCredentials);
+      const content = generateSpaceSeparatedContent(credentials);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -815,7 +780,7 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, []);
+  }, [credentials]);
 
   const handleDownloadSingle = useCallback((credential) => {
     try {
@@ -883,7 +848,18 @@ export default function IndianValidPhoneNumber() {
     }
   };
 
-
+  if (isLoading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   if (queryError) {
     return (
@@ -955,7 +931,7 @@ export default function IndianValidPhoneNumber() {
         />
       </Box>
 
-      {totalCredentialsCount > 0 && (
+      {credentials.length > 0 && (
         <>
           <Grid container spacing={1.5} sx={{ mb: 2 }}>
             {typeSummary.map(({ type, count }) => {
@@ -1270,7 +1246,7 @@ export default function IndianValidPhoneNumber() {
         </>
       )}
 
-      {!hasData && !isLoading ? (
+      {!hasData ? (
         <Alert severity="info" sx={{ fontSize: "0.85rem", mb: 3 }}>
           {debouncedSearch
             ? "No credentials found matching your search."

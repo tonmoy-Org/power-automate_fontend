@@ -1,7 +1,7 @@
 import axiosInstance from './axios';
 
-export const fetchPhoneNumbers = async (params) => {
-    const { data } = await axiosInstance.get(`/phone-numbers`, { params });
+export const fetchPhoneNumbers = async () => {
+    const { data } = await axiosInstance.get(`/phone-numbers`);
     return data;
 };
 

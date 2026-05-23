@@ -73,7 +73,6 @@ import {
 } from "../../api/indianNumbers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
-import axiosInstance from "../../api/axios";
 
 
 const TELECOM_CIRCLES = [
@@ -487,7 +486,6 @@ const CountryCodeRow = memo(({
   globalStartIndex,
   absoluteGroupIdx,
   onBulkEdit,
-  statusFilter,
 }) => {
   const [open, setOpen] = useState(false);
   const [innerPage, setInnerPage] = useState(0);
@@ -511,121 +509,50 @@ const CountryCodeRow = memo(({
     return () => clearTimeout(t);
   }, [innerSearchQuery]);
 
-  const { data: innerNumbers = [], isLoading: isInnerLoading } = useQuery({
-    queryKey: ["indianNumbersGroup", group.operatorName, group.circleName],
-    queryFn: async () => {
-      const response = await axiosInstance.get(`/indian-numbers`, {
-        params: {
-          operator: group.operatorName,
-          circle: group.circleName || ""
-        }
-      });
-      return response.data?.data || [];
-    },
-    enabled: open,
-    staleTime: 30000,
-  });
-
-  const items = useMemo(() => {
-    if (group.items.length > 0 && group.items[0]?.count === undefined) {
-      return group.items;
-    }
-    return innerNumbers;
-  }, [group.items, innerNumbers]);
-
-  const totalGroupCount = useMemo(() => {
-    if (statusFilter && statusFilter !== "all") {
-      if (items.length > 0 && items[0]?.count === undefined) {
-        return items.filter((item) => item.is_active === statusFilter).length;
-      }
-      if (statusFilter === "inactive") return group.inactiveCount || 0;
-      if (statusFilter === "running") return group.runningCount || 0;
-      if (statusFilter === "completed") return group.completedCount || 0;
-    }
-    if (group.items.length > 0 && group.items[0]?.count !== undefined) {
-      return group.items[0].count;
-    }
-    return group.items.length;
-  }, [group.items, items, statusFilter, group]);
-
-  const groupIds = useMemo(() => {
-    if (items.length > 0 && items[0]?.count === undefined) {
-      const list = statusFilter && statusFilter !== "all"
-        ? items.filter((i) => i.is_active === statusFilter)
-        : items;
-      return list.map((i) => i._id);
-    }
-    if (group.items.length > 0 && group.items[0]?.ids !== undefined) {
-      return group.items[0].ids;
-    }
-    return items.map((i) => i._id);
-  }, [group.items, items, statusFilter]);
+  const groupIds = group.items.map((i) => i._id);
 
   const filteredItems = useMemo(() => {
-    let result = items;
-    if (statusFilter && statusFilter !== "all") {
-      result = items.filter((item) => item.is_active === statusFilter);
-    }
-    if (!debouncedInnerSearch) return result;
+    if (!debouncedInnerSearch) return group.items;
     const searchLower = debouncedInnerSearch.toLowerCase();
-    return result.filter((item) => {
-      const numberMatch = item.number && item.number.toLowerCase().includes(searchLower);
+    return group.items.filter((item) => {
+      const numberMatch = item.number.toLowerCase().includes(searchLower);
       const rdpMatch = item.rdp_id && item.rdp_id.toLowerCase() === searchLower;
       return numberMatch || rdpMatch;
     });
-  }, [items, debouncedInnerSearch]);
+  }, [group.items, debouncedInnerSearch]);
 
   useEffect(() => {
     setInnerPage(0);
   }, [group.operator, debouncedInnerSearch]);
 
-  const pagedItems = useMemo(() => filteredItems.slice(
+  const pagedItems = filteredItems.slice(
     innerPage * INNER_PAGE_SIZE,
     (innerPage + 1) * INNER_PAGE_SIZE,
-  ), [filteredItems, innerPage]);
+  );
+  const pagedIds = pagedItems.map((i) => i._id);
 
-  const pagedIds = useMemo(() => pagedItems.map((i) => i._id), [pagedItems]);
-
-  const innerSelectedOnPage = useMemo(() => pagedIds.filter((id) =>
+  const innerSelectedOnPage = pagedIds.filter((id) =>
     innerSelected.includes(id),
-  ), [pagedIds, innerSelected]);
+  );
+  const innerAllOnPageSelected =
+    pagedIds.length > 0 && innerSelectedOnPage.length === pagedIds.length;
+  const innerSomeOnPageSelected =
+    innerSelectedOnPage.length > 0 && !innerAllOnPageSelected;
 
-  const innerAllOnPageSelected = useMemo(() =>
-    pagedIds.length > 0 && innerSelectedOnPage.length === pagedIds.length
-  , [pagedIds, innerSelectedOnPage]);
-
-  const innerSomeOnPageSelected = useMemo(() =>
-    innerSelectedOnPage.length > 0 && !innerAllOnPageSelected
-  , [innerSelectedOnPage, innerAllOnPageSelected]);
-
-  const globalSelectedInGroup = useMemo(() => groupIds.filter((id) =>
+  const globalSelectedInGroup = groupIds.filter((id) =>
     globalSelectedRows.includes(id),
-  ), [groupIds, globalSelectedRows]);
+  );
+  const globalAllSelected =
+    groupIds.length > 0 && globalSelectedInGroup.length === groupIds.length;
+  const globalSomeSelected =
+    globalSelectedInGroup.length > 0 && !globalAllSelected;
+  const hasGlobalChild = globalSelectedInGroup.length > 0;
 
-  const globalAllSelected = useMemo(() =>
-    groupIds.length > 0 && globalSelectedInGroup.length === groupIds.length
-  , [groupIds, globalSelectedInGroup]);
-
-  const globalSomeSelected = useMemo(() =>
-    globalSelectedInGroup.length > 0 && !globalAllSelected
-  , [globalSelectedInGroup, globalAllSelected]);
-
-  const hasGlobalChild = useMemo(() => globalSelectedInGroup.length > 0, [globalSelectedInGroup]);
-
-  const statusCounts = useMemo(() => {
-    if (items.length > 0 && items[0]?.count === undefined) {
-      return {
-        inactive: items.filter((i) => i.is_active === "inactive").length,
-        running: items.filter((i) => i.is_active === "running").length,
-        completed: items.filter((i) => i.is_active === "completed").length,
-      };
-    }
-    return {
-      inactive: group.inactiveCount || 0,
-      running: group.runningCount || 0,
-      completed: group.completedCount || 0,
-    };
-  }, [items, group]);
+  const statusCounts = {
+    inactive: filteredItems.filter((i) => i.is_active === "inactive").length,
+    running: filteredItems.filter((i) => i.is_active === "running").length,
+    completed: filteredItems.filter((i) => i.is_active === "completed").length,
+  };
 
   const handleRowClick = (e) => {
     if (
@@ -859,11 +786,7 @@ const CountryCodeRow = memo(({
 
             <Chip
               size="small"
-              label={
-                debouncedInnerSearch
-                  ? `${filteredItems.length} / ${totalGroupCount} Total`
-                  : `${totalGroupCount} Total`
-              }
+              label={`${filteredItems.length} / ${group.items.length} Total`}
               sx={{
                 height: 20,
                 borderRadius: "4px",
@@ -970,7 +893,7 @@ const CountryCodeRow = memo(({
           onClick={(e) => e.stopPropagation()}
         >
           <Tooltip
-            title={`Delete all ${totalGroupCount} numbers in ${group.operatorName}${group.circleName ? ' - ' + group.circleName : ''}`}
+            title={`Delete all ${group.items.length} numbers in ${group.operatorName}${group.circleName ? ' - ' + group.circleName : ''}`}
             placement="top"
           >
             <IconButton
@@ -1046,7 +969,7 @@ const CountryCodeRow = memo(({
                       ml: 1,
                     }}
                   >
-                    Found {filteredItems.length} of {totalGroupCount} numbers
+                    Found {filteredItems.length} of {group.items.length} numbers
                   </Typography>
                 )}
               </Box>
@@ -1236,31 +1159,7 @@ const CountryCodeRow = memo(({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {isInnerLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} sx={{ p: 4, textAlign: "center" }}>
-                        <LinearProgress
-                          sx={{
-                            width: "60%",
-                            mx: "auto",
-                            borderRadius: "2px",
-                            height: 3,
-                            backgroundColor: alpha(BLUE, 0.1),
-                            "& .MuiLinearProgress-bar": {
-                              backgroundColor: BLUE,
-                            },
-                            mb: 1.5,
-                          }}
-                        />
-                        <Typography
-                          variant="caption"
-                          sx={{ fontSize: "0.75rem", color: alpha(TEXT, 0.45), fontWeight: 500 }}
-                        >
-                          Loading phone numbers...
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : pagedItems.length === 0 ? (
+                  {pagedItems.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} sx={{ p: 3, textAlign: "center" }}>
                         <NoSearchResults
@@ -1582,16 +1481,9 @@ export const IndianNumbers = () => {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ["indianNumbers", debouncedSearch],
-    queryFn: () => {
-      const params = {};
-      if (debouncedSearch.trim()) {
-        params.search = debouncedSearch;
-      } else {
-        params.summary = "true";
-      }
-      return fetchIndianNumbers(params);
-    },
+    queryKey: ["indianNumbers", page, rowsPerPage, debouncedSearch],
+    queryFn: () =>
+      fetchIndianNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
     keepPreviousData: true,
     staleTime: 30000,
     cacheTime: 600000,
@@ -1608,7 +1500,6 @@ export const IndianNumbers = () => {
     mutationFn: createIndianNumber,
     onSuccess: async (data) => {
       await queryClient.invalidateQueries(["indianNumbers"]);
-      await queryClient.invalidateQueries(["indianNumbersGroup"]);
       await refetch();
       setSuccess(data.message || "Indian number created successfully");
       setOpenDialog(false);
@@ -1624,7 +1515,6 @@ export const IndianNumbers = () => {
     mutationFn: bulkCreateIndianNumbers,
     onSuccess: async (data) => {
       await queryClient.invalidateQueries(["indianNumbers"]);
-      await queryClient.invalidateQueries(["indianNumbersGroup"]);
       await refetch();
       setSuccess(data.message);
       setOpenDialog(false);
@@ -1644,106 +1534,196 @@ export const IndianNumbers = () => {
 
   const updateMutation = useMutation({
     mutationFn: updateIndianNumber,
+    onMutate: async (newData) => {
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
+      if (previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.map((item) =>
+              item._id === newData.id ? { ...item, ...newData.data } : item
+            ),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
       setSuccess(data.message || "Indian number updated successfully");
       setOpenDialog(false);
       resetForm();
     },
-    onError: (err) => {
+    onError: (err, newData, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to update phone number");
     },
     onSettled: () => {
-      queryClient.invalidateQueries(["indianNumbers"]);
-      queryClient.invalidateQueries(["indianNumbersGroup"]);
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteIndianNumber,
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
+      if (previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.filter((item) => item._id !== deletedId),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
       setSuccess(data.message || "Indian number deleted successfully");
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, deletedId, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to delete phone number");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries(["indianNumbers"]);
-      queryClient.invalidateQueries(["indianNumbersGroup"]);
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: bulkDeleteIndianNumbers,
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
+      if (previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.filter((item) => !ids.includes(item._id)),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, ids, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to delete phone numbers");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries(["indianNumbers"]);
-      queryClient.invalidateQueries(["indianNumbersGroup"]);
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const bulkStatusMutation = useMutation({
     mutationFn: ({ ids, status }) => bulkUpdateIndianNumberStatus(ids, status),
+    onMutate: async ({ ids, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
+      if (previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.map((item) =>
+              ids.includes(item._id) ? { ...item, is_active: status } : item
+            ),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to update status");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries(["indianNumbers"]);
-      queryClient.invalidateQueries(["indianNumbersGroup"]);
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const bulkUpdateMutation = useMutation({
     mutationFn: ({ ids, data }) => bulkUpdateIndianNumbers(ids, data),
+    onMutate: async ({ ids, data: updateData }) => {
+      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
+      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
+      if (previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          (old) => ({
+            ...old,
+            data: old.data.map((item) =>
+              ids.includes(item._id) ? { ...item, ...updateData } : item
+            ),
+          })
+        );
+      }
+      return { previousData };
+    },
     onSuccess: async (data) => {
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err) => {
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          ["indianNumbers", page, rowsPerPage, debouncedSearch],
+          context.previousData
+        );
+      }
       setError(err.response?.data?.message || "Failed to update numbers");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries(["indianNumbers"]);
-      queryClient.invalidateQueries(["indianNumbersGroup"]);
+      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
     },
   });
 
   const allIndianNumbers = useMemo(() => indianNumbersData?.data || [], [indianNumbersData]);
   const passwordFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
 
-  const filteredNumbers = useMemo(() => {
-    if (statusFilter === "all") return allIndianNumbers;
-    
-    // Summary mode (where array elements are pre-aggregated operator/circle groups)
-    if (allIndianNumbers.length > 0 && allIndianNumbers[0]?.count !== undefined) {
-      return allIndianNumbers.filter((group) => {
-        if (statusFilter === "inactive") return (group.inactiveCount || 0) > 0;
-        if (statusFilter === "running") return (group.runningCount || 0) > 0;
-        if (statusFilter === "completed") return (group.completedCount || 0) > 0;
-        return false;
-      });
-    }
-    
-    // Detailed / search mode (where array elements are individual phone numbers)
-    return allIndianNumbers.filter((item) => item.is_active === statusFilter);
-  }, [allIndianNumbers, statusFilter]);
+  const filteredNumbers = useMemo(() =>
+    statusFilter === "all"
+      ? allIndianNumbers
+      : allIndianNumbers.filter((item) => item.is_active === statusFilter)
+  , [allIndianNumbers, statusFilter]);
 
   const groupedNumbers = useMemo(() => groupByOperatorAndCircle(filteredNumbers), [filteredNumbers]);
 
@@ -2511,7 +2491,6 @@ export const IndianNumbers = () => {
                     globalStartIndex={groupStartIndex}
                     absoluteGroupIdx={absoluteGroupIdx}
                     onBulkEdit={handleBulkEditClick}
-                    statusFilter={statusFilter}
                   />
                 );
               })

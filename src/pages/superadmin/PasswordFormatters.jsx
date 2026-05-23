@@ -105,47 +105,8 @@ const CountryCodeRow = memo(({
     const [open, setOpen] = useState(false);
     const [innerPage, setInnerPage] = useState(0);
 
-    const { data: innerFormatters = [], isLoading: isInnerLoading } = useQuery({
-        queryKey: ["passwordFormattersGroup", countryCode],
-        queryFn: async () => {
-            const response = await axiosInstance.get(`/password-formatters`, {
-                params: {
-                    country_code: countryCode
-                }
-            });
-            return response.data?.data || [];
-        },
-        enabled: open,
-        staleTime: 30000,
-    });
-
-    const resolvedItems = useMemo(() => {
-        if (items.length > 0 && items[0]?.count === undefined) {
-            return items;
-        }
-        return innerFormatters;
-    }, [items, innerFormatters]);
-
-    const totalGroupCount = useMemo(() => {
-        if (items.length > 0 && items[0]?.count !== undefined) {
-            return items[0].count;
-        }
-        return items.length;
-    }, [items]);
-
-    const groupIds = useMemo(() => {
-        if (items.length > 0 && items[0]?.ids !== undefined) {
-            return items[0].ids;
-        }
-        return resolvedItems.map((i) => i._id);
-    }, [items, resolvedItems]);
-
-    const pagedItems = useMemo(() => resolvedItems.slice(
-        innerPage * INNER_PAGE_SIZE,
-        (innerPage + 1) * INNER_PAGE_SIZE
-    ), [resolvedItems, innerPage]);
-
-    const totalInnerPages = useMemo(() => Math.ceil(resolvedItems.length / INNER_PAGE_SIZE), [resolvedItems]);
+    const pagedItems = items.slice(innerPage * INNER_PAGE_SIZE, (innerPage + 1) * INNER_PAGE_SIZE);
+    const totalInnerPages = Math.ceil(items.length / INNER_PAGE_SIZE);
 
     return (
         <>
@@ -161,9 +122,9 @@ const CountryCodeRow = memo(({
                 <TableCell padding="checkbox" sx={{ pl: 2 }} onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                         size="small"
-                        checked={groupIds.length > 0 && groupIds.every(id => selectedRows.includes(id))}
-                        indeterminate={groupIds.some(id => selectedRows.includes(id)) && !groupIds.every(id => selectedRows.includes(id))}
-                        onChange={() => handleSelectGroup(groupIds, groupIds.every(id => selectedRows.includes(id)))}
+                        checked={items.length > 0 && items.every(i => selectedRows.includes(i._id))}
+                        indeterminate={items.some(i => selectedRows.includes(i._id)) && !items.every(i => selectedRows.includes(i._id))}
+                        onChange={() => handleSelectGroup(items.map(i => i._id), items.every(i => selectedRows.includes(i._id)))}
                         sx={{ color: alpha(GREEN_COLOR, 0.6), '&.Mui-checked': { color: GREEN_COLOR } }}
                     />
                 </TableCell>
@@ -183,7 +144,7 @@ const CountryCodeRow = memo(({
                             {countryCode}
                         </Typography>
                         <Chip
-                            label={`${totalGroupCount} Formatter${totalGroupCount !== 1 ? 's' : ''}`}
+                            label={`${items.length} Formatter${items.length !== 1 ? 's' : ''}`}
                             size="small"
                             sx={{
                                 height: 20,
@@ -211,124 +172,101 @@ const CountryCodeRow = memo(({
                             borderRadius: '0 0 8px 8px',
                             overflow: 'hidden'
                         }}>
-                            {isInnerLoading && (
-                                <Box display="flex" flexDirection="column" alignItems="center" py={4} gap={1.5}>
-                                    <LinearProgress sx={{
-                                        width: '80%',
-                                        maxWidth: 400,
-                                        height: 3,
-                                        borderRadius: '2px',
-                                        backgroundColor: alpha(GREEN_COLOR, 0.1),
-                                        '& .MuiLinearProgress-bar': {
-                                            backgroundColor: GREEN_COLOR,
-                                            borderRadius: '2px'
-                                        }
-                                    }} />
-                                    <Typography variant="caption" sx={{ color: alpha(TEXT_PRIMARY, 0.5), fontSize: '0.75rem' }}>
-                                        Loading formatters...
-                                    </Typography>
-                                </Box>
-                            )}
-
-                            {!isInnerLoading && (
-                                <>
-                                    <Table size="small">
-                                        <TableHead>
-                                            <TableRow sx={{ backgroundColor: alpha(GREEN_COLOR, 0.03) }}>
-                                                <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`, width: 40 }} />
-                                                <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1, width: 80 }}>Serial</TableCell>
-                                                <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Add</TableCell>
-                                                <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Index</TableCell>
-                                                <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Index</TableCell>
-                                                <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Add</TableCell>
-                                                <TableCell align="right" sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Actions</TableCell>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow sx={{ backgroundColor: alpha(GREEN_COLOR, 0.03) }}>
+                                        <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.1)}`, width: 40 }} />
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1, width: 80 }}>Serial</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Add</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Start Index</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Index</TableCell>
+                                        <TableCell sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>End Add</TableCell>
+                                        <TableCell align="right" sx={{ fontSize: '0.75rem', fontWeight: 600, color: alpha(TEXT_PRIMARY, 0.6), py: 1 }}>Actions</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {pagedItems.map((formatter, idx) => {
+                                        const serialNumber = innerPage * INNER_PAGE_SIZE + idx + 1;
+                                        return (
+                                            <TableRow
+                                                key={formatter._id}
+                                                hover
+                                                sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
+                                            >
+                                                <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={selectedRows.includes(formatter._id)}
+                                                        onChange={() => handleSelectRow(formatter._id)}
+                                                        sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
+                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
+                                                        {serialNumber}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Chip label={formatter.start_add ?? '—'} size="small"
+                                                        sx={{ backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontWeight: 500, fontSize: '0.7rem', height: 20, fontFamily: 'monospace' }} />
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                        {formatter.start_index ?? '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
+                                                        {formatter.end_index ?? '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell sx={{ py: 1 }}>
+                                                    <Chip label={formatter.end_add ?? '—'} size="small"
+                                                        sx={{ backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontWeight: 500, fontSize: '0.7rem', height: 20, fontFamily: 'monospace' }} />
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ py: 1 }}>
+                                                    <Box display="flex" justifyContent="flex-end">
+                                                        <Tooltip title="Copy formatter">
+                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onCopy(formatter); }} sx={{ color: GREEN_COLOR, p: 0.5 }}>
+                                                                <CopyIcon sx={{ fontSize: '1rem' }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Edit formatter">
+                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(formatter); }} sx={{ color: GREEN_COLOR, p: 0.5 }}>
+                                                                <EditIcon sx={{ fontSize: '1rem' }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Delete formatter">
+                                                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(formatter); }} sx={{ color: RED_COLOR, p: 0.5 }}>
+                                                                <DeleteIcon sx={{ fontSize: '1rem' }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
+                                                </TableCell>
                                             </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {pagedItems.map((formatter, idx) => {
-                                                const serialNumber = innerPage * INNER_PAGE_SIZE + idx + 1;
-                                                return (
-                                                    <TableRow
-                                                        key={formatter._id}
-                                                        hover
-                                                        sx={{ '&:hover': { backgroundColor: alpha(GREEN_COLOR, 0.04) } }}
-                                                    >
-                                                        <TableCell padding="checkbox" sx={{ pl: 2, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
-                                                            <Checkbox
-                                                                size="small"
-                                                                checked={selectedRows.includes(formatter._id)}
-                                                                onChange={() => handleSelectRow(formatter._id)}
-                                                                sx={{ color: alpha(GREEN_COLOR, 0.4), '&.Mui-checked': { color: GREEN_COLOR } }}
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${alpha(GREEN_COLOR, 0.05)}` }}>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY }}>
-                                                                {serialNumber}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell sx={{ py: 1 }}>
-                                                            <Chip label={formatter.start_add ?? '—'} size="small"
-                                                                sx={{ backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontWeight: 500, fontSize: '0.7rem', height: 20, fontFamily: 'monospace' }} />
-                                                        </TableCell>
-                                                        <TableCell sx={{ py: 1 }}>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                                                {formatter.start_index ?? '—'}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell sx={{ py: 1 }}>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: TEXT_PRIMARY, fontFamily: 'monospace' }}>
-                                                                {formatter.end_index ?? '—'}
-                                                            </Typography>
-                                                        </TableCell>
-                                                        <TableCell sx={{ py: 1 }}>
-                                                            <Chip label={formatter.end_add ?? '—'} size="small"
-                                                                sx={{ backgroundColor: alpha(GREEN_COLOR, 0.08), color: GREEN_DARK, fontWeight: 500, fontSize: '0.7rem', height: 20, fontFamily: 'monospace' }} />
-                                                        </TableCell>
-                                                        <TableCell align="right" sx={{ py: 1 }}>
-                                                            <Box display="flex" justifyContent="flex-end">
-                                                                <Tooltip title="Copy formatter">
-                                                                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); onCopy(formatter); }} sx={{ color: GREEN_COLOR, p: 0.5 }}>
-                                                                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                                                                    </IconButton>
-                                                                </Tooltip>
-                                                                <Tooltip title="Edit formatter">
-                                                                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(formatter); }} sx={{ color: GREEN_COLOR, p: 0.5 }}>
-                                                                        <EditIcon sx={{ fontSize: '1rem' }} />
-                                                                    </IconButton>
-                                                                </Tooltip>
-                                                                <Tooltip title="Delete formatter">
-                                                                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(formatter); }} sx={{ color: RED_COLOR, p: 0.5 }}>
-                                                                        <DeleteIcon sx={{ fontSize: '1rem' }} />
-                                                                    </IconButton>
-                                                                </Tooltip>
-                                                            </Box>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
 
-                                    {totalInnerPages > 1 && (
-                                        <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1} px={2} py={0.8}
-                                            sx={{ borderTop: `1px solid ${alpha(GREEN_COLOR, 0.12)}` }}>
-                                            <Typography sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.55) }}>
-                                                {innerPage * INNER_PAGE_SIZE + 1}–{Math.min((innerPage + 1) * INNER_PAGE_SIZE, resolvedItems.length)} of {resolvedItems.length}
-                                            </Typography>
-                                            <IconButton size="small" disabled={innerPage === 0} onClick={() => setInnerPage(p => p - 1)}
-                                                sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}>
-                                                <KeyboardArrowUpIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
-                                            </IconButton>
-                                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: TEXT_PRIMARY }}>
-                                                {innerPage + 1} / {totalInnerPages}
-                                            </Typography>
-                                            <IconButton size="small" disabled={innerPage >= totalInnerPages - 1} onClick={() => setInnerPage(p => p + 1)}
-                                                sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}>
-                                                <KeyboardArrowDownIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
-                                            </IconButton>
-                                        </Box>
-                                    )}
-                                </>
+                            {totalInnerPages > 1 && (
+                                <Box display="flex" alignItems="center" justifyContent="flex-end" gap={1} px={2} py={0.8}
+                                    sx={{ borderTop: `1px solid ${alpha(GREEN_COLOR, 0.12)}` }}>
+                                    <Typography sx={{ fontSize: '0.72rem', color: alpha(TEXT_PRIMARY, 0.55) }}>
+                                        {innerPage * INNER_PAGE_SIZE + 1}–{Math.min((innerPage + 1) * INNER_PAGE_SIZE, items.length)} of {items.length}
+                                    </Typography>
+                                    <IconButton size="small" disabled={innerPage === 0} onClick={() => setInnerPage(p => p - 1)}
+                                        sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}>
+                                        <KeyboardArrowUpIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
+                                    </IconButton>
+                                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: TEXT_PRIMARY }}>
+                                        {innerPage + 1} / {totalInnerPages}
+                                    </Typography>
+                                    <IconButton size="small" disabled={innerPage >= totalInnerPages - 1} onClick={() => setInnerPage(p => p + 1)}
+                                        sx={{ width: 24, height: 24, color: GREEN_COLOR, '&.Mui-disabled': { opacity: 0.3 } }}>
+                                        <KeyboardArrowDownIcon sx={{ fontSize: '1rem', transform: 'rotate(-90deg)' }} />
+                                    </IconButton>
+                                </Box>
                             )}
                         </Box>
                     </Collapse>
@@ -384,15 +322,15 @@ export const PasswordFormatters = () => {
         refetch
     } = useQuery({
         queryKey: ['passwordFormatters', debouncedSearch, debouncedCountry],
-        queryFn: async () => {
-            const params = {};
-            if (debouncedSearch.trim() || debouncedCountry.trim()) {
-                if (debouncedSearch.trim()) params.search = debouncedSearch;
-                if (debouncedCountry.trim()) params.country_code = debouncedCountry;
-            } else {
-                params.summary = "true";
-            }
-            const response = await axiosInstance.get(`/password-formatters`, { params });
+        queryFn: async ({ queryKey }) => {
+            const [, search, country_code] = queryKey;
+            const params = new URLSearchParams({
+                page: 1,
+                limit: 9999, // fetch all, paginate groups client-side
+                search: search || '',
+                country_code: country_code || ''
+            });
+            const response = await axiosInstance.get(`/password-formatters?${params}`);
             return response.data;
         },
         keepPreviousData: true,
@@ -401,93 +339,120 @@ export const PasswordFormatters = () => {
     const createMutation = useMutation({
         mutationFn: createPasswordFormatter,
         onSuccess: (data) => {
+            queryClient.invalidateQueries(['passwordFormatters']);
             setSuccess(data.message || 'Password formatter created successfully');
             setOpenDialog(false);
             resetForm();
         },
         onError: (error) => {
             setError(error.response?.data?.message || 'Failed to create password formatter');
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries(['passwordFormatters']);
-            queryClient.invalidateQueries(['passwordFormattersGroup']);
         }
     });
 
     const bulkCreateMutation = useMutation({
         mutationFn: bulkCreatePasswordFormatters,
         onSuccess: (data) => {
+            queryClient.invalidateQueries(['passwordFormatters']);
             setSuccess(data.message || 'Formatters created successfully');
             setOpenDialog(false);
             resetForm();
         },
         onError: (error) => {
             setError(error.response?.data?.message || 'Failed to create formatters');
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries(['passwordFormatters']);
-            queryClient.invalidateQueries(['passwordFormattersGroup']);
         }
     });
 
     const updateMutation = useMutation({
         mutationFn: updatePasswordFormatter,
+        onMutate: async (newData) => {
+            await queryClient.cancelQueries({ queryKey: ['passwordFormatters'] });
+            const previousData = queryClient.getQueryData(['passwordFormatters', debouncedSearch, debouncedCountry]);
+            if (previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], (old) => ({
+                    ...old,
+                    data: old.data.map(f => f._id === newData.id ? { ...f, ...newData.data } : f)
+                }));
+            }
+            return { previousData };
+        },
         onSuccess: (data) => {
             setSuccess(data.message || 'Password formatter updated successfully');
             setOpenDialog(false);
             resetForm();
         },
-        onError: (error) => {
+        onError: (error, newData, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], context.previousData);
+            }
             setError(error.response?.data?.message || 'Failed to update password formatter');
         },
         onSettled: () => {
             queryClient.invalidateQueries(['passwordFormatters']);
-            queryClient.invalidateQueries(['passwordFormattersGroup']);
         }
     });
 
     const deleteMutation = useMutation({
         mutationFn: deletePasswordFormatter,
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ['passwordFormatters'] });
+            const previousData = queryClient.getQueryData(['passwordFormatters', debouncedSearch, debouncedCountry]);
+            if (previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], (old) => ({
+                    ...old,
+                    data: old.data.filter(f => f._id !== id)
+                }));
+            }
+            return { previousData };
+        },
         onSuccess: (data) => {
             setSuccess(data.message || 'Password formatter deleted successfully');
             setOpenDeleteDialog(false);
             setFormatterToDelete(null);
         },
-        onError: (error) => {
+        onError: (error, id, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], context.previousData);
+            }
             setError(error.response?.data?.message || 'Failed to delete password formatter');
             setOpenDeleteDialog(false);
         },
         onSettled: () => {
             queryClient.invalidateQueries(['passwordFormatters']);
-            queryClient.invalidateQueries(['passwordFormattersGroup']);
         }
     });
 
     const bulkDeleteMutation = useMutation({
         mutationFn: bulkDeletePasswordFormatters,
+        onMutate: async (ids) => {
+            await queryClient.cancelQueries({ queryKey: ['passwordFormatters'] });
+            const previousData = queryClient.getQueryData(['passwordFormatters', debouncedSearch, debouncedCountry]);
+            if (previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], (old) => ({
+                    ...old,
+                    data: old.data.filter(f => !ids.includes(f._id))
+                }));
+            }
+            return { previousData };
+        },
         onSuccess: (data) => {
             setSuccess(data.message || 'Password formatters deleted successfully');
             setOpenDeleteDialog(false);
             setSelectedRows([]);
         },
-        onError: (error) => {
+        onError: (error, ids, context) => {
+            if (context?.previousData) {
+                queryClient.setQueryData(['passwordFormatters', debouncedSearch, debouncedCountry], context.previousData);
+            }
             setError(error.response?.data?.message || 'Failed to delete password formatters');
             setOpenDeleteDialog(false);
         },
         onSettled: () => {
             queryClient.invalidateQueries(['passwordFormatters']);
-            queryClient.invalidateQueries(['passwordFormattersGroup']);
         }
     });
 
     const allFormatters = useMemo(() => formattersData?.data || [], [formattersData]);
-    
-    const allVisibleIds = useMemo(() => {
-        if (allFormatters.length > 0 && allFormatters[0]?.count !== undefined) {
-            return allFormatters.flatMap((f) => f.ids || []);
-        }
-        return allFormatters.map(f => f._id);
-    }, [allFormatters]);
+    const allVisibleIds = useMemo(() => allFormatters.map(f => f._id), [allFormatters]);
 
     const handleSelectRow = useCallback((id) => {
         setSelectedRows(prev =>
@@ -512,23 +477,15 @@ export const PasswordFormatters = () => {
     };
 
     const formatters = useMemo(() => formattersData?.data || [], [formattersData]);
-    const totalCount = useMemo(() => formattersData?.total || 0, [formattersData]);
+    const totalCount = useMemo(() => formattersData?.pagination?.total || 0, [formattersData]);
 
-    const groupedFormatters = useMemo(() => {
-        if (allFormatters.length > 0 && allFormatters[0]?.count !== undefined) {
-            return allFormatters.reduce((acc, group) => {
-                const code = group.country_code || 'Unspecified';
-                acc[code] = [group];
-                return acc;
-            }, {});
-        }
-        return allFormatters.reduce((acc, formatter) => {
-            const code = formatter.country_code || 'Unspecified';
-            if (!acc[code]) acc[code] = [];
-            acc[code].push(formatter);
-            return acc;
-        }, {});
-    }, [allFormatters]);
+    // Group formatters by country code
+    const groupedFormatters = useMemo(() => formatters.reduce((acc, formatter) => {
+        const code = formatter.country_code || 'Unspecified';
+        if (!acc[code]) acc[code] = [];
+        acc[code].push(formatter);
+        return acc;
+    }, {}), [formatters]);
 
     // Sort grouped keys so 'Unspecified' or numbers appear consistently
     const sortedGroupKeys = useMemo(() => Object.keys(groupedFormatters).sort((a, b) => {

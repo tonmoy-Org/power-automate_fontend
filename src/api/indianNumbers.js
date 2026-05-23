@@ -1,7 +1,7 @@
 import axiosInstance from './axios';
 
-export const fetchIndianNumbers = async (params) => {
-    const { data } = await axiosInstance.get(`/indian-numbers`, { params });
+export const fetchIndianNumbers = async () => {
+    const { data } = await axiosInstance.get(`/indian-numbers`);
     return data;
 };
 
