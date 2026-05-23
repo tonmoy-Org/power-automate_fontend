@@ -73,6 +73,7 @@ import {
 } from "../../api/indianNumbers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Helmet } from "react-helmet-async";
+import axiosInstance from "../../api/axios";
 
 
 const TELECOM_CIRCLES = [
@@ -509,50 +510,94 @@ const CountryCodeRow = memo(({
     return () => clearTimeout(t);
   }, [innerSearchQuery]);
 
-  const groupIds = group.items.map((i) => i._id);
+  const { data: innerNumbers = [], isLoading: isInnerLoading } = useQuery({
+    queryKey: ["indianNumbersGroup", group.operatorName, group.circleName],
+    queryFn: async () => {
+      const response = await axiosInstance.get(`/indian-numbers`, {
+        params: {
+          operator: group.operatorName,
+          circle: group.circleName || ""
+        }
+      });
+      return response.data?.data || [];
+    },
+    enabled: open,
+    staleTime: 30000,
+  });
+
+  const items = useMemo(() => {
+    if (group.items.length > 0 && group.items[0]?.count === undefined) {
+      return group.items;
+    }
+    return innerNumbers;
+  }, [group.items, innerNumbers]);
+
+  const totalGroupCount = useMemo(() => {
+    if (group.items.length > 0 && group.items[0]?.count !== undefined) {
+      return group.items[0].count;
+    }
+    return group.items.length;
+  }, [group.items]);
+
+  const groupIds = useMemo(() => {
+    if (group.items.length > 0 && group.items[0]?.ids !== undefined) {
+      return group.items[0].ids;
+    }
+    return items.map((i) => i._id);
+  }, [group.items, items]);
 
   const filteredItems = useMemo(() => {
-    if (!debouncedInnerSearch) return group.items;
+    if (!debouncedInnerSearch) return items;
     const searchLower = debouncedInnerSearch.toLowerCase();
-    return group.items.filter((item) => {
-      const numberMatch = item.number.toLowerCase().includes(searchLower);
+    return items.filter((item) => {
+      const numberMatch = item.number && item.number.toLowerCase().includes(searchLower);
       const rdpMatch = item.rdp_id && item.rdp_id.toLowerCase() === searchLower;
       return numberMatch || rdpMatch;
     });
-  }, [group.items, debouncedInnerSearch]);
+  }, [items, debouncedInnerSearch]);
 
   useEffect(() => {
     setInnerPage(0);
   }, [group.operator, debouncedInnerSearch]);
 
-  const pagedItems = filteredItems.slice(
+  const pagedItems = useMemo(() => filteredItems.slice(
     innerPage * INNER_PAGE_SIZE,
     (innerPage + 1) * INNER_PAGE_SIZE,
-  );
-  const pagedIds = pagedItems.map((i) => i._id);
+  ), [filteredItems, innerPage]);
 
-  const innerSelectedOnPage = pagedIds.filter((id) =>
+  const pagedIds = useMemo(() => pagedItems.map((i) => i._id), [pagedItems]);
+
+  const innerSelectedOnPage = useMemo(() => pagedIds.filter((id) =>
     innerSelected.includes(id),
-  );
-  const innerAllOnPageSelected =
-    pagedIds.length > 0 && innerSelectedOnPage.length === pagedIds.length;
-  const innerSomeOnPageSelected =
-    innerSelectedOnPage.length > 0 && !innerAllOnPageSelected;
+  ), [pagedIds, innerSelected]);
 
-  const globalSelectedInGroup = groupIds.filter((id) =>
+  const innerAllOnPageSelected = useMemo(() =>
+    pagedIds.length > 0 && innerSelectedOnPage.length === pagedIds.length
+  , [pagedIds, innerSelectedOnPage]);
+
+  const innerSomeOnPageSelected = useMemo(() =>
+    innerSelectedOnPage.length > 0 && !innerAllOnPageSelected
+  , [innerSelectedOnPage, innerAllOnPageSelected]);
+
+  const globalSelectedInGroup = useMemo(() => groupIds.filter((id) =>
     globalSelectedRows.includes(id),
-  );
-  const globalAllSelected =
-    groupIds.length > 0 && globalSelectedInGroup.length === groupIds.length;
-  const globalSomeSelected =
-    globalSelectedInGroup.length > 0 && !globalAllSelected;
-  const hasGlobalChild = globalSelectedInGroup.length > 0;
+  ), [groupIds, globalSelectedRows]);
 
-  const statusCounts = {
+  const globalAllSelected = useMemo(() =>
+    groupIds.length > 0 && globalSelectedInGroup.length === groupIds.length
+  , [groupIds, globalSelectedInGroup]);
+
+  const globalSomeSelected = useMemo(() =>
+    globalSelectedInGroup.length > 0 && !globalAllSelected
+  , [globalSelectedInGroup, globalAllSelected]);
+
+  const hasGlobalChild = useMemo(() => globalSelectedInGroup.length > 0, [globalSelectedInGroup]);
+
+  const statusCounts = useMemo(() => ({
     inactive: filteredItems.filter((i) => i.is_active === "inactive").length,
     running: filteredItems.filter((i) => i.is_active === "running").length,
     completed: filteredItems.filter((i) => i.is_active === "completed").length,
-  };
+  }), [filteredItems]);
 
   const handleRowClick = (e) => {
     if (
@@ -786,7 +831,11 @@ const CountryCodeRow = memo(({
 
             <Chip
               size="small"
-              label={`${filteredItems.length} / ${group.items.length} Total`}
+              label={
+                debouncedInnerSearch
+                  ? `${filteredItems.length} / ${totalGroupCount} Total`
+                  : `${totalGroupCount} Total`
+              }
               sx={{
                 height: 20,
                 borderRadius: "4px",
@@ -893,7 +942,7 @@ const CountryCodeRow = memo(({
           onClick={(e) => e.stopPropagation()}
         >
           <Tooltip
-            title={`Delete all ${group.items.length} numbers in ${group.operatorName}${group.circleName ? ' - ' + group.circleName : ''}`}
+            title={`Delete all ${totalGroupCount} numbers in ${group.operatorName}${group.circleName ? ' - ' + group.circleName : ''}`}
             placement="top"
           >
             <IconButton
@@ -969,7 +1018,7 @@ const CountryCodeRow = memo(({
                       ml: 1,
                     }}
                   >
-                    Found {filteredItems.length} of {group.items.length} numbers
+                    Found {filteredItems.length} of {totalGroupCount} numbers
                   </Typography>
                 )}
               </Box>
@@ -1159,7 +1208,31 @@ const CountryCodeRow = memo(({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {pagedItems.length === 0 ? (
+                  {isInnerLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ p: 4, textAlign: "center" }}>
+                        <LinearProgress
+                          sx={{
+                            width: "60%",
+                            mx: "auto",
+                            borderRadius: "2px",
+                            height: 3,
+                            backgroundColor: alpha(BLUE, 0.1),
+                            "& .MuiLinearProgress-bar": {
+                              backgroundColor: BLUE,
+                            },
+                            mb: 1.5,
+                          }}
+                        />
+                        <Typography
+                          variant="caption"
+                          sx={{ fontSize: "0.75rem", color: alpha(TEXT, 0.45), fontWeight: 500 }}
+                        >
+                          Loading phone numbers...
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : pagedItems.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} sx={{ p: 3, textAlign: "center" }}>
                         <NoSearchResults
@@ -1481,9 +1554,16 @@ export const IndianNumbers = () => {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ["indianNumbers", page, rowsPerPage, debouncedSearch],
-    queryFn: () =>
-      fetchIndianNumbers({ page, limit: rowsPerPage, search: debouncedSearch }),
+    queryKey: ["indianNumbers", debouncedSearch],
+    queryFn: () => {
+      const params = {};
+      if (debouncedSearch.trim()) {
+        params.search = debouncedSearch;
+      } else {
+        params.summary = "true";
+      }
+      return fetchIndianNumbers(params);
+    },
     keepPreviousData: true,
     staleTime: 30000,
     cacheTime: 600000,
@@ -1500,6 +1580,7 @@ export const IndianNumbers = () => {
     mutationFn: createIndianNumber,
     onSuccess: async (data) => {
       await queryClient.invalidateQueries(["indianNumbers"]);
+      await queryClient.invalidateQueries(["indianNumbersGroup"]);
       await refetch();
       setSuccess(data.message || "Indian number created successfully");
       setOpenDialog(false);
@@ -1515,6 +1596,7 @@ export const IndianNumbers = () => {
     mutationFn: bulkCreateIndianNumbers,
     onSuccess: async (data) => {
       await queryClient.invalidateQueries(["indianNumbers"]);
+      await queryClient.invalidateQueries(["indianNumbersGroup"]);
       await refetch();
       setSuccess(data.message);
       setOpenDialog(false);
@@ -1534,185 +1616,84 @@ export const IndianNumbers = () => {
 
   const updateMutation = useMutation({
     mutationFn: updateIndianNumber,
-    onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
-      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      if (previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          (old) => ({
-            ...old,
-            data: old.data.map((item) =>
-              item._id === newData.id ? { ...item, ...newData.data } : item
-            ),
-          })
-        );
-      }
-      return { previousData };
-    },
     onSuccess: async (data) => {
       setSuccess(data.message || "Indian number updated successfully");
       setOpenDialog(false);
       resetForm();
     },
-    onError: (err, newData, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          context.previousData
-        );
-      }
+    onError: (err) => {
       setError(err.response?.data?.message || "Failed to update phone number");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
+      queryClient.invalidateQueries(["indianNumbers"]);
+      queryClient.invalidateQueries(["indianNumbersGroup"]);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteIndianNumber,
-    onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
-      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      if (previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          (old) => ({
-            ...old,
-            data: old.data.filter((item) => item._id !== deletedId),
-          })
-        );
-      }
-      return { previousData };
-    },
     onSuccess: async (data) => {
       setSuccess(data.message || "Indian number deleted successfully");
       closeConfirm();
     },
-    onError: (err, deletedId, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          context.previousData
-        );
-      }
+    onError: (err) => {
       setError(err.response?.data?.message || "Failed to delete phone number");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
+      queryClient.invalidateQueries(["indianNumbers"]);
+      queryClient.invalidateQueries(["indianNumbersGroup"]);
     },
   });
 
   const bulkDeleteMutation = useMutation({
     mutationFn: bulkDeleteIndianNumbers,
-    onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
-      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      if (previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          (old) => ({
-            ...old,
-            data: old.data.filter((item) => !ids.includes(item._id)),
-          })
-        );
-      }
-      return { previousData };
-    },
     onSuccess: async (data) => {
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err, ids, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          context.previousData
-        );
-      }
+    onError: (err) => {
       setError(err.response?.data?.message || "Failed to delete phone numbers");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
+      queryClient.invalidateQueries(["indianNumbers"]);
+      queryClient.invalidateQueries(["indianNumbersGroup"]);
     },
   });
 
   const bulkStatusMutation = useMutation({
     mutationFn: ({ ids, status }) => bulkUpdateIndianNumberStatus(ids, status),
-    onMutate: async ({ ids, status }) => {
-      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
-      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      if (previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          (old) => ({
-            ...old,
-            data: old.data.map((item) =>
-              ids.includes(item._id) ? { ...item, is_active: status } : item
-            ),
-          })
-        );
-      }
-      return { previousData };
-    },
     onSuccess: async (data) => {
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          context.previousData
-        );
-      }
+    onError: (err) => {
       setError(err.response?.data?.message || "Failed to update status");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
+      queryClient.invalidateQueries(["indianNumbers"]);
+      queryClient.invalidateQueries(["indianNumbersGroup"]);
     },
   });
 
   const bulkUpdateMutation = useMutation({
     mutationFn: ({ ids, data }) => bulkUpdateIndianNumbers(ids, data),
-    onMutate: async ({ ids, data: updateData }) => {
-      await queryClient.cancelQueries({ queryKey: ["indianNumbers"] });
-      const previousData = queryClient.getQueryData(["indianNumbers", page, rowsPerPage, debouncedSearch]);
-      if (previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          (old) => ({
-            ...old,
-            data: old.data.map((item) =>
-              ids.includes(item._id) ? { ...item, ...updateData } : item
-            ),
-          })
-        );
-      }
-      return { previousData };
-    },
     onSuccess: async (data) => {
       setSuccess(data.message);
       setGlobalSelectedRows([]);
       closeConfirm();
     },
-    onError: (err, variables, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ["indianNumbers", page, rowsPerPage, debouncedSearch],
-          context.previousData
-        );
-      }
+    onError: (err) => {
       setError(err.response?.data?.message || "Failed to update numbers");
       closeConfirm();
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["indianNumbers"] });
+      queryClient.invalidateQueries(["indianNumbers"]);
+      queryClient.invalidateQueries(["indianNumbersGroup"]);
     },
   });
 

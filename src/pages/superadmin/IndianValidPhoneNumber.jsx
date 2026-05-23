@@ -30,6 +30,7 @@ import {
   TableHead,
   TableRow,
   Paper,
+  LinearProgress,
 } from "@mui/material";
 import {
   Delete as DeleteIcon,
@@ -76,23 +77,25 @@ const CARDS_PER_PAGE = 20;
 
 // API functions
 const fetchPhoneCredentials = async () => {
-  const response = await axiosInstance.get("/phone-credentials?country_code=91");
+  const response = await axiosInstance.get("/indian-phone-credentials", {
+    params: { summary: "true" },
+  });
   return response.data;
 };
 
 const bulkDeleteCredentials = async (target) => {
   const ids = target.ids || target;
-  const response = await axiosInstance.delete("/phone-credentials/bulk", { data: { ids } });
+  const response = await axiosInstance.delete("/indian-phone-credentials/bulk", { data: { ids } });
   return response.data;
 };
 
-const deleteByTypeAndCountry = async ({ type, countryCode }) => {
-  const response = await axiosInstance.delete("/phone-credentials/by-type", { data: { type, countryCode } });
+const deleteByTypeAndCountry = async ({ type }) => {
+  const response = await axiosInstance.delete("/indian-phone-credentials/by-type", { data: { type } });
   return response.data;
 };
 
 const deleteSingleCredential = async (id) => {
-  const response = await axiosInstance.delete(`/phone-credentials/${id}`);
+  const response = await axiosInstance.delete(`/indian-phone-credentials/${id}`);
   return response.data;
 };
 
@@ -256,7 +259,7 @@ const CircleCredentialCard = memo(({
               const typeColor = getTypeColor(true);
               const typeBg = getTypeBackground(true);
               const typeBorder = getTypeBorder(true);
-              const typeCount = typeCredentials.length;
+              const typeCount = typeCredentials.reduce((sum, c) => sum + (c.count ?? 1), 0);
               const isDeletingType =
                 deleteTypeTarget?.circleName === circleName &&
                 deleteTypeTarget?.type === type;
@@ -386,7 +389,7 @@ const CircleCredentialCard = memo(({
                           const op = c.operator || 'Unknown';
                           const key = `${op}`;
                           if (!acc[key]) acc[key] = { operator: op, count: 0 };
-                          acc[key].count++;
+                          acc[key].count += (c.count ?? 1);
                           return acc;
                         }, {})
                       ).map(([key, data]) => (
@@ -447,21 +450,30 @@ export default function IndianValidPhoneNumber() {
     isLoading,
     error: queryError,
   } = useQuery({
-    queryKey: ["phoneCredentials"],
+    queryKey: ["indianPhoneCredentials"],
     queryFn: fetchPhoneCredentials,
-    staleTime: 0,
-    cacheTime: 0,
+    staleTime: 30000, // Cache is fresh for 30 seconds
+    cacheTime: 300000, // Keep cache in memory for 5 minutes
   });
 
-  const credentials = useMemo(() => rawCredentials.filter((c) => c.country_code === "91" && c.circle && c.operator), [rawCredentials]);
+  const credentialsResponse = rawCredentials;
+
+  const credentials = useMemo(() => {
+    if (credentialsResponse?.summary) return credentialsResponse.data;
+    return Array.isArray(credentialsResponse) ? credentialsResponse : (credentialsResponse?.data ?? []);
+  }, [credentialsResponse]);
+
+  const totalCredentialsCount = useMemo(() => {
+    return credentials.reduce((sum, c) => sum + (c.count ?? 1), 0);
+  }, [credentials]);
 
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteCredentials,
     onMutate: async (target) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
-      const previousData = queryClient.getQueryData(["phoneCredentials"]);
+      await queryClient.cancelQueries({ queryKey: ["indianPhoneCredentials"] });
+      const previousData = queryClient.getQueryData(["indianPhoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["phoneCredentials"], (old) => {
+        queryClient.setQueryData(["indianPhoneCredentials"], (old) => {
           if (target.isType) {
             return old.filter((item) => !(item.circle === target.circleName && item.type === target.type));
           }
@@ -476,22 +488,22 @@ export default function IndianValidPhoneNumber() {
     },
     onError: (err, target, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(["phoneCredentials"], context.previousData);
+        queryClient.setQueryData(["indianPhoneCredentials"], context.previousData);
       }
       setError(err.response?.data?.message || "Failed to delete credentials");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneCredentials"] });
+      queryClient.invalidateQueries({ queryKey: ["indianPhoneCredentials"] });
     },
   });
 
   const deleteTypeMutation = useMutation({
     mutationFn: deleteByTypeAndCountry,
     onMutate: async (target) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
-      const previousData = queryClient.getQueryData(["phoneCredentials"]);
+      await queryClient.cancelQueries({ queryKey: ["indianPhoneCredentials"] });
+      const previousData = queryClient.getQueryData(["indianPhoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["phoneCredentials"], (old) =>
+        queryClient.setQueryData(["indianPhoneCredentials"], (old) =>
           old.filter((item) => !(item.country_code === target.countryCode && item.type === target.type))
         );
       }
@@ -503,22 +515,22 @@ export default function IndianValidPhoneNumber() {
     },
     onError: (err, target, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(["phoneCredentials"], context.previousData);
+        queryClient.setQueryData(["indianPhoneCredentials"], context.previousData);
       }
       setError(err.response?.data?.message || "Failed to delete type credentials");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneCredentials"] });
+      queryClient.invalidateQueries({ queryKey: ["indianPhoneCredentials"] });
     },
   });
 
   const deleteSingleMutation = useMutation({
     mutationFn: deleteSingleCredential,
     onMutate: async (target) => {
-      await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
-      const previousData = queryClient.getQueryData(["phoneCredentials"]);
+      await queryClient.cancelQueries({ queryKey: ["indianPhoneCredentials"] });
+      const previousData = queryClient.getQueryData(["indianPhoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["phoneCredentials"], (old) =>
+        queryClient.setQueryData(["indianPhoneCredentials"], (old) =>
           old.filter((item) => item._id !== target._id)
         );
       }
@@ -530,12 +542,12 @@ export default function IndianValidPhoneNumber() {
     },
     onError: (err, target, context) => {
       if (context?.previousData) {
-        queryClient.setQueryData(["phoneCredentials"], context.previousData);
+        queryClient.setQueryData(["indianPhoneCredentials"], context.previousData);
       }
       setError(err.response?.data?.message || "Failed to delete credential");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["phoneCredentials"] });
+      queryClient.invalidateQueries({ queryKey: ["indianPhoneCredentials"] });
     },
   });
 
@@ -546,19 +558,20 @@ export default function IndianValidPhoneNumber() {
 
   const typeSummary = useMemo(
     () =>
-      uniqueTypes.map((type) => ({
-        type,
-        count: credentials.filter((c) => c.type === type).length,
-      })),
+      uniqueTypes.map((type) => {
+        const matching = credentials.filter((c) => c.type === type);
+        const count = matching.reduce((sum, c) => sum + (c.count ?? 1), 0);
+        return { type, count };
+      }),
     [credentials, uniqueTypes],
   );
 
   const operatorSummary = useMemo(() => {
     const counts = credentials.reduce((acc, c) => {
-      if (c.country_code !== "91" || !c.operator) return acc;
+      if (!c.operator) return acc;
       const key = c.operator;
       if (!acc[key]) acc[key] = { label: key, count: 0 };
-      acc[key].count++;
+      acc[key].count += (c.count ?? 1);
       return acc;
     }, {});
     return Object.values(counts).sort((a, b) => b.count - a.count);
@@ -566,10 +579,10 @@ export default function IndianValidPhoneNumber() {
 
   const circleSummary = useMemo(() => {
     const counts = credentials.reduce((acc, c) => {
-      if (c.country_code !== "91" || !c.circle) return acc;
+      if (!c.circle) return acc;
       const key = c.circle;
       if (!acc[key]) acc[key] = { label: key, count: 0 };
-      acc[key].count++;
+      acc[key].count += (c.count ?? 1);
       return acc;
     }, {});
     return Object.values(counts).sort((a, b) => b.count - a.count);
@@ -580,10 +593,10 @@ export default function IndianValidPhoneNumber() {
     const query = debouncedSearch.toLowerCase();
     return credentials.filter(
       (cred) =>
-        cred.country_code?.toLowerCase().includes(query) ||
-        cred.phone?.toLowerCase().includes(query) ||
+        cred.circle?.toLowerCase().includes(query) ||
+        cred.operator?.toLowerCase().includes(query) ||
         cred.type?.toLowerCase().includes(query) ||
-        (cred.url && cred.url.toLowerCase().includes(query)) ||
+        cred.phone?.toLowerCase().includes(query) ||
         (cred.password && cred.password.toLowerCase().includes(query)),
     );
   }, [credentials, debouncedSearch]);
@@ -659,18 +672,22 @@ export default function IndianValidPhoneNumber() {
     }
   }, []);
 
-  const handleDownload = useCallback((circleCredentials, type) => {
+  const handleDownload = useCallback(async (circleCredentials, type) => {
     try {
       if (!circleCredentials || !circleCredentials.length) {
         setError("No credentials to download");
         return;
       }
-      const content = generateTypeContent(circleCredentials, type);
+      const circleName = circleCredentials[0]?.circle || "unknown";
+      setSuccess(`Fetching Circle ${circleName} Type ${type} credentials for download...`);
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const filtered = fullCredentials.filter((c) => c.circle === circleName);
+      const content = generateTypeContent(filtered, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
       }
-      const circleName = circleCredentials[0]?.circle || "unknown";
       downloadTxtFile(content, `${circleName}_type_${type}.txt`);
       setSuccess(
         `Downloaded Type ${type} credentials for Circle: ${circleName}`,
@@ -680,14 +697,18 @@ export default function IndianValidPhoneNumber() {
     }
   }, []);
 
-  const handleDownloadAll = useCallback((circleCredentials) => {
+  const handleDownloadAll = useCallback(async (circleCredentials) => {
     try {
       if (!circleCredentials || !circleCredentials.length) {
         setError("No credentials to download");
         return;
       }
       const circleName = circleCredentials[0]?.circle || "unknown";
-      const content = generateAllContent(circleCredentials, uniqueTypes);
+      setSuccess(`Fetching all credentials for Circle ${circleName}...`);
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const filtered = fullCredentials.filter((c) => c.circle === circleName);
+      const content = generateAllContent(filtered, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -699,9 +720,12 @@ export default function IndianValidPhoneNumber() {
     }
   }, [uniqueTypes]);
 
-  const handleDownloadTypeAll = useCallback((type) => {
+  const handleDownloadTypeAll = useCallback(async (type) => {
     try {
-      const content = generateTypeContent(credentials, type);
+      setSuccess(`Fetching all Type ${type} credentials for download...`);
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const content = generateTypeContent(fullCredentials, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
@@ -711,11 +735,14 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, [credentials]);
+  }, []);
 
-  const handleDownloadOperatorAll = useCallback((operator) => {
+  const handleDownloadOperatorAll = useCallback(async (operator) => {
     try {
-      const content = credentials
+      setSuccess(`Fetching all Operator ${operator} credentials...`);
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const content = fullCredentials
         .filter((c) => c.operator === operator)
         .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
         .join("\n");
@@ -728,11 +755,14 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, [credentials]);
+  }, []);
 
-  const handleDownloadCircleAll = useCallback((circle) => {
+  const handleDownloadCircleAll = useCallback(async (circle) => {
     try {
-      const content = credentials
+      setSuccess(`Fetching all Circle ${circle} credentials...`);
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const content = fullCredentials
         .filter((c) => c.circle === circle)
         .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
         .join("\n");
@@ -745,11 +775,14 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, [credentials]);
+  }, []);
 
-  const handleDownloadAllCredentials = useCallback(() => {
+  const handleDownloadAllCredentials = useCallback(async () => {
     try {
-      const content = generateAllContent(credentials, uniqueTypes);
+      setSuccess("Fetching all credentials for download (this may take a few seconds)...");
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const content = generateAllContent(fullCredentials, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -758,15 +791,18 @@ export default function IndianValidPhoneNumber() {
         content,
         `all_credentials_${new Date().toISOString().split("T")[0]}.txt`,
       );
-      setSuccess(`Downloaded all credentials (${credentials.length} total)`);
+      setSuccess(`Downloaded all credentials (${fullCredentials.length} total)`);
     } catch {
       setError("Failed to download file");
     }
-  }, [credentials, uniqueTypes]);
+  }, [uniqueTypes]);
 
-  const handleDownloadAllSpaceSeparated = useCallback(() => {
+  const handleDownloadAllSpaceSeparated = useCallback(async () => {
     try {
-      const content = generateSpaceSeparatedContent(credentials);
+      setSuccess("Fetching all credentials for space-separated download...");
+      const response = await axiosInstance.get("/indian-phone-credentials");
+      const fullCredentials = response.data;
+      const content = generateSpaceSeparatedContent(fullCredentials);
       if (!content) {
         setError("No credentials to download");
         return;
@@ -779,7 +815,7 @@ export default function IndianValidPhoneNumber() {
     } catch {
       setError("Failed to download file");
     }
-  }, [credentials]);
+  }, []);
 
   const handleDownloadSingle = useCallback((credential) => {
     try {
@@ -847,18 +883,7 @@ export default function IndianValidPhoneNumber() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="400px"
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
+
 
   if (queryError) {
     return (
@@ -899,6 +924,21 @@ export default function IndianValidPhoneNumber() {
         </Typography>
       </Box>
 
+      {isLoading && (
+        <LinearProgress
+          sx={{
+            height: 3,
+            borderRadius: 1.5,
+            mb: 2.5,
+            backgroundColor: alpha(WARNING_COLOR, 0.12),
+            "& .MuiLinearProgress-bar": {
+              backgroundColor: WARNING_COLOR,
+              borderRadius: 1.5,
+            },
+          }}
+        />
+      )}
+
       <Box mb={2.5}>
         <StyledTextField
           placeholder="Search by Circle, Country Code, phone, type, URL, or password…"
@@ -915,7 +955,7 @@ export default function IndianValidPhoneNumber() {
         />
       </Box>
 
-      {credentials.length > 0 && (
+      {totalCredentialsCount > 0 && (
         <>
           <Grid container spacing={1.5} sx={{ mb: 2 }}>
             {typeSummary.map(({ type, count }) => {
@@ -1230,7 +1270,7 @@ export default function IndianValidPhoneNumber() {
         </>
       )}
 
-      {!hasData ? (
+      {!hasData && !isLoading ? (
         <Alert severity="info" sx={{ fontSize: "0.85rem", mb: 3 }}>
           {debouncedSearch
             ? "No credentials found matching your search."
