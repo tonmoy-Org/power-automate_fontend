@@ -593,11 +593,20 @@ const CountryCodeRow = memo(({
 
   const hasGlobalChild = useMemo(() => globalSelectedInGroup.length > 0, [globalSelectedInGroup]);
 
-  const statusCounts = useMemo(() => ({
-    inactive: filteredItems.filter((i) => i.is_active === "inactive").length,
-    running: filteredItems.filter((i) => i.is_active === "running").length,
-    completed: filteredItems.filter((i) => i.is_active === "completed").length,
-  }), [filteredItems]);
+  const statusCounts = useMemo(() => {
+    if (filteredItems.length > 0) {
+      return {
+        inactive: filteredItems.filter((i) => i.is_active === "inactive").length,
+        running: filteredItems.filter((i) => i.is_active === "running").length,
+        completed: filteredItems.filter((i) => i.is_active === "completed").length,
+      };
+    }
+    return {
+      inactive: group.inactiveCount || 0,
+      running: group.runningCount || 0,
+      completed: group.completedCount || 0,
+    };
+  }, [filteredItems, group]);
 
   const handleRowClick = (e) => {
     if (
