@@ -55,8 +55,10 @@ export const SuperAdminDashboard = () => {
     indianPhoneCredentials: 0,
   });
   
-  const [credentials, setCredentials] = useState([]);
+  const [globalTypeSummary, setGlobalTypeSummary] = useState([]);
+  const [indianTypeSummary, setIndianTypeSummary] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     fetchCounts();
@@ -68,7 +70,8 @@ export const SuperAdminDashboard = () => {
       const res = await axiosInstance.get('/phone-numbers/dashboard/stats');
       if (res.data?.success) {
         setCounts(res.data.data.counts);
-        setCredentials(res.data.data.credentials || []);
+        setGlobalTypeSummary(res.data.data.globalTypeSummary || []);
+        setIndianTypeSummary(res.data.data.indianTypeSummary || []);
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -77,34 +80,20 @@ export const SuperAdminDashboard = () => {
     }
   };
 
-  const globalTypeSummary = useMemo(() => {
-    const globalCreds = credentials.filter(c => c.country_code !== '91');
-    const uniqueTypes = [...new Set(globalCreds.map((c) => c.type))].sort();
-    return uniqueTypes.map((type) => ({
-      type,
-      count: globalCreds.filter((c) => c.type === type).length,
-    }));
-  }, [credentials]);
-
-  const indianTypeSummary = useMemo(() => {
-    const indianCreds = credentials.filter(c => c.country_code === '91' && c.circle && c.operator);
-    const uniqueTypes = [...new Set(indianCreds.map((c) => c.type))].sort();
-    return uniqueTypes.map((type) => ({
-      type,
-      count: indianCreds.filter((c) => c.type === type).length,
-    }));
-  }, [credentials]);
-
-  const handleDownloadTypeAll = (type, isIndian = false) => {
+  const handleDownloadTypeAll = async (type, isIndian = false) => {
     try {
-      const filtered = credentials.filter(
-        (cred) =>
-          cred.type === type &&
-          (isIndian ? cred.country_code === '91' : cred.country_code !== '91')
-      );
-      if (!filtered.length) return;
+      setDownloading(true);
+      const endpoint = isIndian ? '/indian-phone-credentials' : '/phone-credentials';
+      const params = isIndian ? { type } : { type, exclude_country_code: '91' };
+      
+      const res = await axiosInstance.get(endpoint, { params });
+      const records = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      
+      if (!records.length) {
+        return;
+      }
 
-      const content = filtered
+      const content = records
         .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
         .join('\n');
 
@@ -119,6 +108,8 @@ export const SuperAdminDashboard = () => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to download file:', error);
+    } finally {
+      setDownloading(false);
     }
   };
 
