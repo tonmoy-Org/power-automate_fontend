@@ -76,7 +76,7 @@ const CARDS_PER_PAGE = 20;
 
 // API functions
 const fetchPhoneCredentials = async () => {
-  const response = await axiosInstance.get("/phone-credentials?exclude_country_code=91");
+  const response = await axiosInstance.get("/phone-credentials?country_code=91");
   return response.data;
 };
 
@@ -97,9 +97,9 @@ const deleteSingleCredential = async (id) => {
 };
 
 // Helper functions
-const groupByCountryCode = (credentials) => {
+const groupByCircle = (credentials) => {
   return credentials.reduce((acc, curr) => {
-    const code = curr.country_code || "Unknown";
+    const code = curr.circle || "Unknown";
     if (!acc[code]) acc[code] = [];
     acc[code].push(curr);
     return acc;
@@ -153,9 +153,9 @@ const generateSpaceSeparatedContent = (credentials) =>
     .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
     .join("\n");
 
-const CountryCredentialCard = memo(({
-  countryCode,
-  countryCredentials,
+const CircleCredentialCard = memo(({
+  circleName,
+  circleCredentials,
   deleteTarget,
   deleteTypeTarget,
   onDownloadAll,
@@ -171,8 +171,8 @@ const CountryCredentialCard = memo(({
   WARNING_COLOR,
   RED_COLOR
 }) => {
-  const isDeleting = deleteTarget?.countryCode === countryCode;
-  
+  const isDeleting = deleteTarget?.circleName === circleName;
+
   return (
     <Grid item xs={12} sm={6} md={6}>
       <Card
@@ -196,7 +196,7 @@ const CountryCredentialCard = memo(({
               fontWeight={700}
               sx={{ fontSize: "0.9rem", letterSpacing: "0.01em" }}
             >
-              Country Code: {countryCode}
+              Circle: {circleName}
             </Typography>
           }
           action={
@@ -204,7 +204,7 @@ const CountryCredentialCard = memo(({
               <Tooltip title="Download all credentials (phone:password)">
                 <IconButton
                   size="small"
-                  onClick={() => onDownloadAll(countryCredentials)}
+                  onClick={() => onDownloadAll(circleCredentials)}
                   sx={{
                     color: WARNING_COLOR,
                     p: 0.75,
@@ -219,7 +219,7 @@ const CountryCredentialCard = memo(({
               <Tooltip title="Delete all credentials for this Country Code">
                 <IconButton
                   size="small"
-                  onClick={() => onDeleteCard(countryCode, countryCredentials)}
+                  onClick={() => onDeleteCard(circleName, circleCredentials)}
                   disabled={isAnyMutationLoading}
                   sx={{
                     color: RED_COLOR,
@@ -247,10 +247,10 @@ const CountryCredentialCard = memo(({
         <CardContent sx={{ pt: 0.5, px: 2, pb: 1.5 }}>
           {uniqueTypes
             .filter((type) =>
-              countryCredentials.some((cred) => cred.type === type),
+              circleCredentials.some((cred) => cred.type === type),
             )
             .map((type, index, arr) => {
-              const typeCredentials = countryCredentials.filter(
+              const typeCredentials = circleCredentials.filter(
                 (cred) => cred.type === type,
               );
               const typeColor = getTypeColor(true);
@@ -258,7 +258,7 @@ const CountryCredentialCard = memo(({
               const typeBorder = getTypeBorder(true);
               const typeCount = typeCredentials.length;
               const isDeletingType =
-                deleteTypeTarget?.countryCode === countryCode &&
+                deleteTypeTarget?.circleName === circleName &&
                 deleteTypeTarget?.type === type;
 
               return (
@@ -326,7 +326,7 @@ const CountryCredentialCard = memo(({
                       >
                         <IconButton
                           size="small"
-                          onClick={() => onDownload(countryCredentials, type)}
+                          onClick={() => onDownload(circleCredentials, type)}
                           sx={{
                             color: typeColor,
                             p: 0.5,
@@ -348,7 +348,7 @@ const CountryCredentialCard = memo(({
                           size="small"
                           onClick={() =>
                             onDeleteType(
-                              countryCode,
+                              circleName,
                               type,
                               typeCredentials,
                             )
@@ -378,6 +378,28 @@ const CountryCredentialCard = memo(({
                     </Box>
                   </Box>
 
+                  {typeCredentials.some(c => c.operator) && (
+                    <Box px={1.5} py={0.5} pb={1} sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                      {Object.entries(
+                        typeCredentials.reduce((acc, c) => {
+                          if (!c.operator) return acc;
+                          const op = c.operator || 'Unknown';
+                          const key = `${op}`;
+                          if (!acc[key]) acc[key] = { operator: op, count: 0 };
+                          acc[key].count++;
+                          return acc;
+                        }, {})
+                      ).map(([key, data]) => (
+                        <Chip
+                          key={key}
+                          label={`${data.operator} (${data.count})`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: '0.65rem', height: 20, borderColor: alpha(typeColor, 0.4), color: typeColor, fontWeight: 600 }}
+                        />
+                      ))}
+                    </Box>
+                  )}
 
                   {index < arr.length - 1 && (
                     <Divider sx={{ opacity: 0.25, my: 0.25 }} />
@@ -391,7 +413,7 @@ const CountryCredentialCard = memo(({
   );
 });
 
-export default function ValidPhoneNumber() {
+export default function IndianValidPhoneNumber() {
   const theme = useTheme();
   const queryClient = useQueryClient();
 
@@ -431,7 +453,7 @@ export default function ValidPhoneNumber() {
     cacheTime: 0,
   });
 
-  const credentials = useMemo(() => rawCredentials.filter((c) => c.country_code !== "91"), [rawCredentials]);
+  const credentials = useMemo(() => rawCredentials.filter((c) => c.country_code === "91" && c.circle && c.operator), [rawCredentials]);
 
   const deleteMutation = useMutation({
     mutationFn: bulkDeleteCredentials,
@@ -439,9 +461,12 @@ export default function ValidPhoneNumber() {
       await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
       const previousData = queryClient.getQueryData(["phoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["phoneCredentials"], (old) => 
-          old.filter((item) => item.country_code !== target.countryCode)
-        );
+        queryClient.setQueryData(["phoneCredentials"], (old) => {
+          if (target.isType) {
+            return old.filter((item) => !(item.circle === target.circleName && item.type === target.type));
+          }
+          return old.filter((item) => item.circle !== target.circleName);
+        });
       }
       return { previousData };
     },
@@ -466,7 +491,7 @@ export default function ValidPhoneNumber() {
       await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
       const previousData = queryClient.getQueryData(["phoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["phoneCredentials"], (old) => 
+        queryClient.setQueryData(["phoneCredentials"], (old) =>
           old.filter((item) => !(item.country_code === target.countryCode && item.type === target.type))
         );
       }
@@ -493,7 +518,7 @@ export default function ValidPhoneNumber() {
       await queryClient.cancelQueries({ queryKey: ["phoneCredentials"] });
       const previousData = queryClient.getQueryData(["phoneCredentials"]);
       if (previousData) {
-        queryClient.setQueryData(["phoneCredentials"], (old) => 
+        queryClient.setQueryData(["phoneCredentials"], (old) =>
           old.filter((item) => item._id !== target._id)
         );
       }
@@ -564,7 +589,7 @@ export default function ValidPhoneNumber() {
   }, [credentials, debouncedSearch]);
 
   const filteredAndGroupedCredentials = useMemo(() => {
-    return groupByCountryCode(filteredCredentials);
+    return groupByCircle(filteredCredentials);
   }, [filteredCredentials]);
 
   const allEntries = useMemo(() => Object.entries(filteredAndGroupedCredentials), [filteredAndGroupedCredentials]);
@@ -634,33 +659,41 @@ export default function ValidPhoneNumber() {
     }
   }, []);
 
-  const handleDownload = useCallback((countryCredentials, type) => {
+  const handleDownload = useCallback((circleCredentials, type) => {
     try {
-      const content = generateTypeContent(countryCredentials, type);
+      if (!circleCredentials || !circleCredentials.length) {
+        setError("No credentials to download");
+        return;
+      }
+      const content = generateTypeContent(circleCredentials, type);
       if (!content) {
         setError(`No Type ${type} credentials to download`);
         return;
       }
-      const countryCode = countryCredentials[0]?.country_code || "unknown";
-      downloadTxtFile(content, `${countryCode}_type_${type}.txt`);
+      const circleName = circleCredentials[0]?.circle || "unknown";
+      downloadTxtFile(content, `${circleName}_type_${type}.txt`);
       setSuccess(
-        `Downloaded Type ${type} credentials for Country Code: ${countryCode}`,
+        `Downloaded Type ${type} credentials for Circle: ${circleName}`,
       );
     } catch {
       setError("Failed to download file");
     }
   }, []);
 
-  const handleDownloadAll = useCallback((countryCredentials) => {
+  const handleDownloadAll = useCallback((circleCredentials) => {
     try {
-      const countryCode = countryCredentials[0]?.country_code || "unknown";
-      const content = generateAllContent(countryCredentials, uniqueTypes);
+      if (!circleCredentials || !circleCredentials.length) {
+        setError("No credentials to download");
+        return;
+      }
+      const circleName = circleCredentials[0]?.circle || "unknown";
+      const content = generateAllContent(circleCredentials, uniqueTypes);
       if (!content) {
         setError("No credentials to download");
         return;
       }
-      downloadTxtFile(content, `${countryCode}_all_credentials.txt`);
-      setSuccess(`Downloaded all credentials for Country Code: ${countryCode}`);
+      downloadTxtFile(content, `${circleName}_all_credentials.txt`);
+      setSuccess(`Downloaded all credentials for Circle: ${circleName}`);
     } catch {
       setError("Failed to download file");
     }
@@ -675,6 +708,40 @@ export default function ValidPhoneNumber() {
       }
       downloadTxtFile(content, `all_type_${type}_credentials.txt`);
       setSuccess(`Downloaded all Type ${type} credentials`);
+    } catch {
+      setError("Failed to download file");
+    }
+  }, [credentials]);
+
+  const handleDownloadOperatorAll = useCallback((operator) => {
+    try {
+      const content = credentials
+        .filter((c) => c.operator === operator)
+        .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
+        .join("\n");
+      if (!content) {
+        setError(`No Operator ${operator} credentials to download`);
+        return;
+      }
+      downloadTxtFile(content, `all_operator_${operator}_credentials.txt`);
+      setSuccess(`Downloaded all Operator ${operator} credentials`);
+    } catch {
+      setError("Failed to download file");
+    }
+  }, [credentials]);
+
+  const handleDownloadCircleAll = useCallback((circle) => {
+    try {
+      const content = credentials
+        .filter((c) => c.circle === circle)
+        .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
+        .join("\n");
+      if (!content) {
+        setError(`No Circle ${circle} credentials to download`);
+        return;
+      }
+      downloadTxtFile(content, `all_circle_${circle}_credentials.txt`);
+      setSuccess(`Downloaded all Circle ${circle} credentials`);
     } catch {
       setError("Failed to download file");
     }
@@ -741,14 +808,14 @@ export default function ValidPhoneNumber() {
     }
   }, []);
 
-  const handleDeleteCard = useCallback((countryCode, countryCredentials) => {
-    const ids = countryCredentials.map((c) => c._id);
-    setDeleteTarget({ countryCode, ids, count: ids.length });
+  const handleDeleteCard = useCallback((circleName, circleCredentials) => {
+    const ids = circleCredentials.map((c) => c._id);
+    setDeleteTarget({ circleName, ids, count: ids.length });
   }, []);
 
-  const handleDeleteType = useCallback((countryCode, type, typeCredentials) => {
+  const handleDeleteType = useCallback((circleName, type, typeCredentials) => {
     setDeleteTypeTarget({
-      countryCode,
+      circleName,
       type,
       count: typeCredentials.length,
       ids: typeCredentials.map((c) => c._id),
@@ -765,9 +832,11 @@ export default function ValidPhoneNumber() {
 
   const handleDeleteTypeConfirm = () => {
     if (deleteTypeTarget) {
-      deleteTypeMutation.mutate({
-        type: deleteTypeTarget.type,
-        countryCode: deleteTypeTarget.countryCode,
+      deleteMutation.mutate({
+        circleName: deleteTypeTarget.circleName,
+        ids: deleteTypeTarget.ids,
+        isType: true,
+        type: deleteTypeTarget.type
       });
     }
   };
@@ -806,7 +875,7 @@ export default function ValidPhoneNumber() {
   return (
     <Box>
       <Helmet>
-        <title>Valid Phone & Password | Power Automate</title>
+        <title>Indian Valid Phone & Password | Power Automate</title>
       </Helmet>
 
       <Box sx={{ mb: 3 }}>
@@ -820,19 +889,19 @@ export default function ValidPhoneNumber() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          Valid Phone & Password
+          Indian Valid Phone & Password
         </Typography>
         <Typography
           variant="caption"
           sx={{ fontSize: "0.75rem", color: alpha(TEXT_PRIMARY, 0.6) }}
         >
-          Manage and download phone credentials grouped by Country Code
+          Manage and download Indian phone credentials
         </Typography>
       </Box>
 
       <Box mb={2.5}>
         <StyledTextField
-          placeholder="Search by Country Code, phone, type, URL, or password…"
+          placeholder="Search by Circle, Country Code, phone, type, URL, or password…"
           value={searchQuery}
           onChange={handleSearch}
           size="small"
@@ -925,12 +994,9 @@ export default function ValidPhoneNumber() {
             })}
           </Grid>
 
-          {[
-            { data: operatorSummary, prefix: "Op: " },
-            { data: circleSummary, prefix: "Cir: " }
-          ].map((summaryGroup, idx) => summaryGroup.data.length > 0 && (
-            <Grid container spacing={1.5} sx={{ mb: 2 }} key={idx}>
-              {summaryGroup.data.map(({ label, count }) => {
+          {operatorSummary.length > 0 && (
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              {operatorSummary.map(({ label, count }) => {
                 const color = getTypeColor(count > 0);
                 const bg = getTypeBackground(count > 0);
                 const border = getTypeBorder(count > 0);
@@ -961,7 +1027,7 @@ export default function ValidPhoneNumber() {
                         >
                           <Box display="flex" alignItems="center" gap={1}>
                             <Chip
-                              label={`${summaryGroup.prefix}${label}`}
+                              label={`Op: ${label}`}
                               size="small"
                               sx={{
                                 fontSize: "0.7rem",
@@ -979,6 +1045,25 @@ export default function ValidPhoneNumber() {
                               {count}
                             </Typography>
                           </Box>
+
+                          <Tooltip title={`Download all Operator ${label}`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDownloadOperatorAll(label)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? color : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(color, 0.15),
+                                  },
+                                }}
+                              >
+                                <DownloadAllIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                         </Box>
                       </CardContent>
                     </Card>
@@ -986,7 +1071,86 @@ export default function ValidPhoneNumber() {
                 );
               })}
             </Grid>
-          ))}
+          )}
+
+          {circleSummary.length > 0 && (
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              {circleSummary.map(({ label, count }) => {
+                const color = getTypeColor(count > 0);
+                const bg = getTypeBackground(count > 0);
+                const border = getTypeBorder(count > 0);
+
+                return (
+                  <Grid item xs="auto" key={label}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        minWidth: 130,
+                        border: `1px solid ${border}`,
+                        borderRadius: 2,
+                        background: bg,
+                        transition: "box-shadow 0.2s",
+                        "&:hover": {
+                          boxShadow: `0 2px 10px ${alpha(color, 0.25)}`,
+                        },
+                      }}
+                    >
+                      <CardContent
+                        sx={{ py: 1.25, px: 2, "&:last-child": { pb: 1.25 } }}
+                      >
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          gap={1.5}
+                        >
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Chip
+                              label={`Cir: ${label}`}
+                              size="small"
+                              sx={{
+                                fontSize: "0.7rem",
+                                height: 22,
+                                backgroundColor: alpha(color, 0.15),
+                                color,
+                                border: `1px solid ${border}`,
+                                fontWeight: 700,
+                              }}
+                            />
+                            <Typography
+                              fontWeight={700}
+                              sx={{ fontSize: "1rem", color, lineHeight: 1 }}
+                            >
+                              {count}
+                            </Typography>
+                          </Box>
+
+                          <Tooltip title={`Download all Circle ${label}`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDownloadCircleAll(label)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? color : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(color, 0.15),
+                                  },
+                                }}
+                              >
+                                <DownloadAllIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
 
           <Box sx={{ mb: 3 }}>
             <Card
@@ -1016,7 +1180,7 @@ export default function ValidPhoneNumber() {
                       letterSpacing: "0.02em",
                     }}
                   >
-                    All Valid Phone & Password
+                    All Indian Valid Phone & Password
                   </Typography>
                   <Box
                     sx={{
@@ -1075,11 +1239,11 @@ export default function ValidPhoneNumber() {
       ) : (
         <>
           <Grid container spacing={2.5}>
-            {paginatedEntries.map(([countryCode, countryCredentials]) => (
-              <CountryCredentialCard
-                key={countryCode}
-                countryCode={countryCode}
-                countryCredentials={countryCredentials}
+            {paginatedEntries.map(([circleName, circleCredentials]) => (
+              <CircleCredentialCard
+                key={circleName}
+                circleName={circleName}
+                circleCredentials={circleCredentials}
                 deleteTarget={deleteTarget}
                 deleteTypeTarget={deleteTypeTarget}
                 onDownloadAll={handleDownloadAll}
@@ -1088,9 +1252,7 @@ export default function ValidPhoneNumber() {
                 onDeleteType={handleDeleteType}
                 theme={theme}
                 uniqueTypes={uniqueTypes}
-                isAnyMutationLoading={
-                  deleteMutation.isLoading || deleteTypeMutation.isLoading
-                }
+                isAnyMutationLoading={deleteMutation.isLoading}
                 getTypeColor={getTypeColor}
                 getTypeBackground={getTypeBackground}
                 getTypeBorder={getTypeBorder}
@@ -1122,7 +1284,7 @@ export default function ValidPhoneNumber() {
             >
               Showing {(page - 1) * CARDS_PER_PAGE + 1}–
               {Math.min(page * CARDS_PER_PAGE, allEntries.length)} of{" "}
-              {allEntries.length} Country Code
+              {allEntries.length} Circle
               {allEntries.length !== 1 ? "s" : ""}
             </Typography>
           </Box>
@@ -1212,7 +1374,7 @@ export default function ValidPhoneNumber() {
       <Dialog
         open={!!deleteTypeTarget}
         onClose={() =>
-          !deleteTypeMutation.isLoading && setDeleteTypeTarget(null)
+          !deleteMutation.isLoading && setDeleteTypeTarget(null)
         }
         maxWidth="xs"
         fullWidth
@@ -1256,16 +1418,16 @@ export default function ValidPhoneNumber() {
             onClick={() => setDeleteTypeTarget(null)}
             size="medium"
             sx={{ fontSize: "0.85rem", px: 2 }}
-            disabled={deleteTypeMutation.isLoading}
+            disabled={deleteMutation.isLoading}
           >
             Cancel
           </OutlineButton>
           <Button
             variant="contained"
             onClick={handleDeleteTypeConfirm}
-            disabled={deleteTypeMutation.isLoading}
+            disabled={deleteMutation.isLoading}
             startIcon={
-              deleteTypeMutation.isLoading ? (
+              deleteMutation.isLoading ? (
                 <CircularProgress size={15} sx={{ color: "white" }} />
               ) : (
                 <DeleteIcon sx={{ fontSize: "0.9rem" }} />
@@ -1284,7 +1446,7 @@ export default function ValidPhoneNumber() {
               },
             }}
           >
-            {deleteTypeMutation.isLoading ? "Deleting…" : "Delete Type"}
+            {deleteMutation.isLoading ? "Deleting…" : "Delete Type"}
           </Button>
         </DialogActions>
       </Dialog>

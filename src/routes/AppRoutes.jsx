@@ -12,6 +12,7 @@ const PhoneNumbers = React.lazy(() => import('../pages/superadmin/PhoneNumbers')
 const IndianNumbers = React.lazy(() => import('../pages/superadmin/IndianNumbers'));
 const PasswordFormatters = React.lazy(() => import('../pages/superadmin/PasswordFormatters'));
 const ValidPhoneNumber = React.lazy(() => import('../pages/superadmin/ValidPhoneNumber'));
+const IndianValidPhoneNumber = React.lazy(() => import('../pages/superadmin/IndianValidPhoneNumber'));
 const MachineManagement = React.lazy(() => import('../pages/superadmin/MachineManagement'));
 
 
@@ -65,6 +66,7 @@ export const AppRoutes = () => {
             <Route path="indian-numbers" element={<IndianNumbers />} />
             <Route path="password-formatters" element={<PasswordFormatters />} />
             <Route path="valid-phone-password" element={<ValidPhoneNumber />} />
+            <Route path="indian-valid-phone-password" element={<IndianValidPhoneNumber />} />
             <Route path="machine-management" element={<MachineManagement />} />
             <Route path="profile" element={<SuperAdminProfile />} />
           </Route>

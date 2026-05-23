@@ -8,6 +8,7 @@ import {
     VpnKey as VpnKeyIcon,
     Computer as ComputerIcon,
     Flag as FlagIcon,
+    PhonelinkLock as PhonelinkLockIcon,
 } from '@mui/icons-material';
 
 export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
@@ -54,6 +55,11 @@ export const SuperAdminMenuComponent = ({ onMenuItemClick }) => {
                     text: 'Valid Phone & Password',
                     icon: <VpnKeyIcon />,
                     path: '/superadmin-dashboard/valid-phone-password'
+                },
+                {
+                    text: 'Indian Phone & Password',
+                    icon: <PhonelinkLockIcon />,
+                    path: '/superadmin-dashboard/indian-valid-phone-password'
                 },
             ]
         },
