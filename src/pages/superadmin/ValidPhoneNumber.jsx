@@ -97,7 +97,7 @@ const copyToClipboard = async (text, successMessage, errorMessage) => {
 const generateTypeContent = (credentials, type) =>
   credentials
     .filter((cred) => cred.type === type)
-    .map((cred) => `${cred.phone}:${cred.password}`)
+    .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
     .join("\n");
 
 const generateDetailedContent = (credentials) =>
@@ -215,6 +215,28 @@ export default function ValidPhoneNumber() {
       })),
     [credentials, uniqueTypes],
   );
+
+  const operatorSummary = useMemo(() => {
+    const counts = credentials.reduce((acc, c) => {
+      if (!c.operator) return acc;
+      const key = c.operator;
+      if (!acc[key]) acc[key] = { label: key, count: 0 };
+      acc[key].count++;
+      return acc;
+    }, {});
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [credentials]);
+
+  const circleSummary = useMemo(() => {
+    const counts = credentials.reduce((acc, c) => {
+      if (!c.circle) return acc;
+      const key = c.circle;
+      if (!acc[key]) acc[key] = { label: key, count: 0 };
+      acc[key].count++;
+      return acc;
+    }, {});
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [credentials]);
 
   const filteredCredentials = useMemo(() => {
     if (!searchQuery.trim()) return credentials;
@@ -346,6 +368,40 @@ export default function ValidPhoneNumber() {
     }
   };
 
+  const handleDownloadOperatorAll = (operator) => {
+    try {
+      const content = credentials
+        .filter((c) => c.operator === operator)
+        .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
+        .join("\n");
+      if (!content) {
+        setError(`No Operator ${operator} credentials to download`);
+        return;
+      }
+      downloadTxtFile(content, `all_operator_${operator}_credentials.txt`);
+      setSuccess(`Downloaded all Operator ${operator} credentials`);
+    } catch {
+      setError("Failed to download file");
+    }
+  };
+
+  const handleDownloadCircleAll = (circle) => {
+    try {
+      const content = credentials
+        .filter((c) => c.circle === circle)
+        .map((cred) => `${cred.phone}\t${cred.password}\t${cred.type}`)
+        .join("\n");
+      if (!content) {
+        setError(`No Circle ${circle} credentials to download`);
+        return;
+      }
+      downloadTxtFile(content, `all_circle_${circle}_credentials.txt`);
+      setSuccess(`Downloaded all Circle ${circle} credentials`);
+    } catch {
+      setError("Failed to download file");
+    }
+  };
+
   const handleDownloadAllCredentials = () => {
     try {
       const content = generateAllContent(credentials, uniqueTypes);
@@ -365,7 +421,7 @@ export default function ValidPhoneNumber() {
 
   const handleDownloadSingle = (credential) => {
     try {
-      const content = `${credential.phone}:${credential.password}`;
+      const content = `${credential.phone}\t${credential.password}\t${credential.type}`;
       downloadTxtFile(
         content,
         `${credential.country_code}_${credential.phone}_${credential.type}.txt`,
@@ -588,6 +644,165 @@ export default function ValidPhoneNumber() {
               );
             })}
           </Grid>
+
+          {operatorSummary.length > 0 && (
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              {operatorSummary.map(({ label, count }) => {
+                const color = getTypeColor(count > 0);
+                const bg = getTypeBackground(count > 0);
+                const border = getTypeBorder(count > 0);
+
+                return (
+                  <Grid item xs="auto" key={label}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        minWidth: 130,
+                        border: `1px solid ${border}`,
+                        borderRadius: 2,
+                        background: bg,
+                        transition: "box-shadow 0.2s",
+                        "&:hover": {
+                          boxShadow: `0 2px 10px ${alpha(color, 0.25)}`,
+                        },
+                      }}
+                    >
+                      <CardContent
+                        sx={{ py: 1.25, px: 2, "&:last-child": { pb: 1.25 } }}
+                      >
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          gap={1.5}
+                        >
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Chip
+                              label={`Op: ${label}`}
+                              size="small"
+                              sx={{
+                                fontSize: "0.7rem",
+                                height: 22,
+                                backgroundColor: alpha(color, 0.15),
+                                color,
+                                border: `1px solid ${border}`,
+                                fontWeight: 700,
+                              }}
+                            />
+                            <Typography
+                              fontWeight={700}
+                              sx={{ fontSize: "1rem", color, lineHeight: 1 }}
+                            >
+                              {count}
+                            </Typography>
+                          </Box>
+
+                          <Tooltip title={`Download all Operator ${label}`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDownloadOperatorAll(label)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? color : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(color, 0.15),
+                                  },
+                                }}
+                              >
+                                <DownloadAllIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
+
+          {circleSummary.length > 0 && (
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              {circleSummary.map(({ label, count }) => {
+                const color = getTypeColor(count > 0);
+                const bg = getTypeBackground(count > 0);
+                const border = getTypeBorder(count > 0);
+
+                return (
+                  <Grid item xs="auto" key={label}>
+                    <Card
+                      elevation={0}
+                      sx={{
+                        minWidth: 130,
+                        border: `1px solid ${border}`,
+                        borderRadius: 2,
+                        background: bg,
+                        transition: "box-shadow 0.2s",
+                        "&:hover": {
+                          boxShadow: `0 2px 10px ${alpha(color, 0.25)}`,
+                        },
+                      }}
+                    >
+                      <CardContent
+                        sx={{ py: 1.25, px: 2, "&:last-child": { pb: 1.25 } }}
+                      >
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          gap={1.5}
+                        >
+                          <Box display="flex" alignItems="center" gap={1}>
+                            <Chip
+                              label={`Cir: ${label}`}
+                              size="small"
+                              sx={{
+                                fontSize: "0.7rem",
+                                height: 22,
+                                backgroundColor: alpha(color, 0.15),
+                                color,
+                                border: `1px solid ${border}`,
+                                fontWeight: 700,
+                              }}
+                            />
+                            <Typography
+                              fontWeight={700}
+                              sx={{ fontSize: "1rem", color, lineHeight: 1 }}
+                            >
+                              {count}
+                            </Typography>
+                          </Box>
+
+                          <Tooltip title={`Download all Circle ${label}`}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDownloadCircleAll(label)}
+                                disabled={count === 0}
+                                sx={{
+                                  color: count > 0 ? color : GREY_COLOR,
+                                  p: 0.5,
+                                  "&:hover": {
+                                    backgroundColor: alpha(color, 0.15),
+                                  },
+                                }}
+                              >
+                                <DownloadAllIcon sx={{ fontSize: 18 }} />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          )}
+
 
           <Box sx={{ mb: 3 }}>
             <Card
@@ -896,6 +1111,51 @@ export default function ValidPhoneNumber() {
                                   </Tooltip>
                                 </Box>
                               </Box>
+
+                              {typeCredentials.some(c => c.operator || c.circle) && (
+                                <Box px={1.5} py={0.5} pb={1} sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, alignItems: 'center' }}>
+                                  {typeCredentials.some(c => c.operator) &&
+                                    Object.entries(
+                                      typeCredentials.reduce((acc, c) => {
+                                        if (!c.operator) return acc;
+                                        const op = c.operator || 'Unknown';
+                                        const key = `${op}`;
+                                        if (!acc[key]) acc[key] = { operator: op, count: 0 };
+                                        acc[key].count++;
+                                        return acc;
+                                      }, {})
+                                    ).map(([key, data]) => (
+                                      <Chip
+                                        key={`op-${key}`}
+                                        label={`${data.operator} (${data.count})`}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ fontSize: '0.65rem', height: 20, borderColor: alpha(typeColor, 0.4), color: typeColor, fontWeight: 600 }}
+                                      />
+                                    ))
+                                  }
+                                  {typeCredentials.some(c => c.circle) &&
+                                    Object.entries(
+                                      typeCredentials.reduce((acc, c) => {
+                                        if (!c.circle) return acc;
+                                        const cir = c.circle || 'Unknown';
+                                        const key = `${cir}`;
+                                        if (!acc[key]) acc[key] = { circle: cir, count: 0 };
+                                        acc[key].count++;
+                                        return acc;
+                                      }, {})
+                                    ).map(([key, data]) => (
+                                      <Chip
+                                        key={`cir-${key}`}
+                                        label={`Cir: ${data.circle} (${data.count})`}
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ fontSize: '0.65rem', height: 20, borderColor: alpha(WARNING_COLOR, 0.4), color: WARNING_COLOR, fontWeight: 600 }}
+                                      />
+                                    ))
+                                  }
+                                </Box>
+                              )}
 
                               {index < arr.length - 1 && (
                                 <Divider sx={{ opacity: 0.25, my: 0.25 }} />
