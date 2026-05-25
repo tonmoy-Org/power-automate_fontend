@@ -82,8 +82,8 @@ const fetchPhoneCredentials = async () => {
 };
 
 const bulkDeleteCredentials = async (target) => {
-  const ids = target.ids || target;
-  const response = await axiosInstance.delete("/indian-phone-credentials/bulk", { data: { ids } });
+  const payload = Array.isArray(target) ? { ids: target } : (target.ids ? { ids: target.ids } : target);
+  const response = await axiosInstance.delete("/indian-phone-credentials/bulk", { data: payload });
   return response.data;
 };
 
@@ -464,6 +464,18 @@ export default function IndianValidPhoneNumber() {
       if (previousData) {
         queryClient.setQueryData(["indianPhoneCredentials"], (old) => {
           if (!old) return [];
+          if (target && target.all) {
+            return [];
+          }
+          if (target && target.operator) {
+            return old.filter((item) => item.operator !== target.operator);
+          }
+          if (target && target.circle) {
+            return old.filter((item) => item.circle !== target.circle);
+          }
+          if (target && target.type) {
+            return old.filter((item) => item.type !== target.type);
+          }
           const idsToDelete = Array.isArray(target)
             ? target
             : target.ids
@@ -487,12 +499,15 @@ export default function IndianValidPhoneNumber() {
     onSuccess: (data) => {
       setSuccess(data.message || "Credentials deleted successfully");
       setDeleteTarget(null);
+      setDeleteTypeTarget(null);
     },
     onError: (err, target, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(["indianPhoneCredentials"], context.previousData);
       }
       setError(err.response?.data?.message || "Failed to delete credentials");
+      setDeleteTarget(null);
+      setDeleteTypeTarget(null);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["indianPhoneCredentials"] });
@@ -832,7 +847,7 @@ export default function IndianValidPhoneNumber() {
 
   const handleDeleteCard = useCallback((circleName, circleCredentials) => {
     const ids = circleCredentials.map((c) => c._id);
-    setDeleteTarget({ circleName, ids, count: ids.length });
+    setDeleteTarget({ circleName, ids, count: ids.length, circle: circleName });
   }, []);
 
   const handleDeleteType = useCallback((circleName, type, typeCredentials) => {
@@ -853,6 +868,7 @@ export default function IndianValidPhoneNumber() {
     const ids = typeCredentials.map((c) => c._id);
     setDeleteTarget({
       label: `Type ${type}`,
+      type,
       ids,
       count: ids.length,
     });
@@ -863,6 +879,7 @@ export default function IndianValidPhoneNumber() {
     const ids = operatorCredentials.map((c) => c._id);
     setDeleteTarget({
       label: `Operator ${operator}`,
+      operator,
       ids,
       count: ids.length,
     });
@@ -873,6 +890,7 @@ export default function IndianValidPhoneNumber() {
     const ids = circleCredentials.map((c) => c._id);
     setDeleteTarget({
       label: `Circle ${circle}`,
+      circle,
       ids,
       count: ids.length,
     });
@@ -882,22 +900,34 @@ export default function IndianValidPhoneNumber() {
     const ids = credentials.map((c) => c._id);
     setDeleteTarget({
       label: "All Profiles",
+      all: true,
       ids,
       count: ids.length,
     });
   }, [credentials]);
 
   const handleDeleteConfirm = () => {
-    if (deleteTarget) deleteMutation.mutate(deleteTarget);
+    if (deleteTarget) {
+      if (deleteTarget.all) {
+        deleteMutation.mutate({ all: true });
+      } else if (deleteTarget.operator) {
+        deleteMutation.mutate({ operator: deleteTarget.operator });
+      } else if (deleteTarget.circle && !deleteTarget.circleName) {
+        deleteMutation.mutate({ circle: deleteTarget.circle });
+      } else if (deleteTarget.circleName) {
+        deleteMutation.mutate({ circle: deleteTarget.circleName });
+      } else if (deleteTarget.type) {
+        deleteMutation.mutate({ type: deleteTarget.type });
+      } else {
+        deleteMutation.mutate({ ids: deleteTarget.ids });
+      }
+    }
   };
 
   const handleDeleteTypeConfirm = () => {
     if (deleteTypeTarget) {
       deleteMutation.mutate({
-        circleName: deleteTypeTarget.circleName,
         ids: deleteTypeTarget.ids,
-        isType: true,
-        type: deleteTypeTarget.type
       });
     }
   };

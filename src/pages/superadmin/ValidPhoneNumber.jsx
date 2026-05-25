@@ -45,9 +45,10 @@ const fetchPhoneCredentials = async () => {
   return Array.isArray(raw) ? raw : (raw?.data ?? []);
 };
 
-const bulkDeleteCredentials = async (ids) => {
+const bulkDeleteCredentials = async (target) => {
+  const payload = Array.isArray(target) ? { ids: target } : target;
   const response = await axiosInstance.delete("/phone-credentials/bulk", {
-    data: { ids },
+    data: payload,
   });
   return response.data;
 };
@@ -163,6 +164,21 @@ export default function ValidPhoneNumber() {
       if (previousData) {
         queryClient.setQueryData(["phoneCredentials"], (old) => {
           if (!old) return [];
+          if (target && target.all) {
+            return [];
+          }
+          if (target && target.operator) {
+            return old.filter((item) => item.operator !== target.operator);
+          }
+          if (target && target.circle) {
+            return old.filter((item) => item.circle !== target.circle);
+          }
+          if (target && target.type) {
+            return old.filter((item) => item.type !== target.type);
+          }
+          if (target && target.countryCode) {
+            return old.filter((item) => item.country_code !== target.countryCode);
+          }
           const idsToDelete = Array.isArray(target)
             ? target
             : target.ids
@@ -535,6 +551,7 @@ export default function ValidPhoneNumber() {
     const ids = typeCredentials.map((c) => c._id);
     setDeleteTarget({
       countryCode: `Type ${type}`,
+      type,
       ids,
       count: ids.length,
     });
@@ -545,6 +562,7 @@ export default function ValidPhoneNumber() {
     const ids = operatorCredentials.map((c) => c._id);
     setDeleteTarget({
       countryCode: `Operator ${operator}`,
+      operator,
       ids,
       count: ids.length,
     });
@@ -555,6 +573,7 @@ export default function ValidPhoneNumber() {
     const ids = circleCredentials.map((c) => c._id);
     setDeleteTarget({
       countryCode: `Circle ${circle}`,
+      circle,
       ids,
       count: ids.length,
     });
@@ -564,13 +583,26 @@ export default function ValidPhoneNumber() {
     const ids = credentials.map((c) => c._id);
     setDeleteTarget({
       countryCode: "All Profiles",
+      all: true,
       ids,
       count: ids.length,
     });
   };
 
   const handleDeleteConfirm = () => {
-    if (deleteTarget) deleteMutation.mutate(deleteTarget.ids);
+    if (deleteTarget) {
+      if (deleteTarget.all) {
+        deleteMutation.mutate({ all: true });
+      } else if (deleteTarget.operator) {
+        deleteMutation.mutate({ operator: deleteTarget.operator });
+      } else if (deleteTarget.circle) {
+        deleteMutation.mutate({ circle: deleteTarget.circle });
+      } else if (deleteTarget.type) {
+        deleteMutation.mutate({ type: deleteTarget.type });
+      } else {
+        deleteMutation.mutate({ ids: deleteTarget.ids });
+      }
+    }
   };
 
   const handleDeleteTypeConfirm = () => {
